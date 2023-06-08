@@ -1,0 +1,11 @@
+>13gs_0-A
+A 0 M 0
+A 1 P 0
+A 2 P 0
+A 3 Y 0
+A 4 T 0
+A 5 V 0
+A 6 V 0
+A 7 Y 0
+A 8 F 0
+A 9 P 0
