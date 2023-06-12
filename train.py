@@ -75,9 +75,9 @@ if __name__ == '__main__':
     Script to train and evaluate ScanNet on the Protein-protein binding site data set.
     Model is trained from scratch.
     '''
-    check = False # Check = True to verify installation, =False for full training.
+    check = True # Check = True to verify installation, =False for full training.
     train = True # True to retrain, False to evaluate the model shown in paper.
-    use_evolutionary = True # True to use evolutionary information (requires hhblits and a sequence database), False otherwise.
+    use_evolutionary = False # True to use evolutionary information (requires hhblits and a sequence database), False otherwise.
     Lmax_aa = 256 if check else 1024
     ''' 
     Maximum length of the protein sequences.
@@ -85,7 +85,7 @@ if __name__ == '__main__':
     If memory allows it, use the largest protein length found in the dataset.
     For PPBS, we used Lmax_aa = 1024 in the paper.
     '''
-    epochs_max = 2 if check else 100
+    epochs_max = 2 if check else 10
 
     ncores = 4
 
@@ -189,7 +189,7 @@ if __name__ == '__main__':
 
         list_inputs.append(inputs)
         list_outputs.append(outputs)
-        list_weights.append( weights )
+        list_weights.append(weights)
 
 
 
@@ -243,7 +243,7 @@ if __name__ == '__main__':
             N_graph=32, # Number of gaussian kernels for amino acid NAM
             nfeatures_aa=21 if use_evolutionary else 20, # Number of amino acid-wise input attributes.
             nfeatures_atom=12, # Number of atom-wise input attributes (categorical variable).
-            nembedding_atom=12, # Dimension of atom attribute embedding. If = nfeatures_atom, use non-trainable one-hot-encoding.
+            nembedding_atom=12, # Dimension of atom attribute embedding. If = nfeatures_atom, use non-trainable one-hot-encoding. # possible changes
             nembedding_aa=32, # Dimension of amino acid attribute embedding.
             nembedding_graph=1, # Number of values per edge for the NAM.
             dense_pooling=64, # Number of channels for atom -> amino acid pooling operation.
