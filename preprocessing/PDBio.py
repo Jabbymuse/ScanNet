@@ -173,6 +173,8 @@ class myPDBList(Bio.PDB.PDBList):
             print("Downloading PDB structure '%s'..." % code)
         try:
             urlcleanup()
+            url = "https"+url[3:]
+            print(url)
             urlretrieve(url, filename)
         except IOError:
             if self._verbose:

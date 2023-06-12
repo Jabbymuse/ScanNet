@@ -473,7 +473,6 @@ class grouped_Predictor_wrapper(Predictor_wrapper):
             Lsvalidation = [len(input_) for input_ in validation_inputs[0] ]
         else:
             has_validation = False
-
         if self.verbose:
             print('Generating groups...')
         groups = self.group_examples(Ls)

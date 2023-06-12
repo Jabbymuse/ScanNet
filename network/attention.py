@@ -4,8 +4,6 @@ import tensorflow as tf
 
 
 
-
-
 class AttentionLayer(Layer):
     def __init__(self, self_attention=True,beta=True,**kwargs):
         self.support_masking = True
