@@ -85,7 +85,7 @@ if __name__ == '__main__':
     If memory allows it, use the largest protein length found in the dataset.
     For PPBS, we used Lmax_aa = 1024 in the paper.
     '''
-    epochs_max = 2 if check else 10
+    epochs_max = 10
 
     ncores = 4
 

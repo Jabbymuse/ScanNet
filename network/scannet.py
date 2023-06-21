@@ -865,10 +865,6 @@ def initialize_ScanNet(
     extra_params = {'epochs': epochs, 'batch_size': batch_size}
     return model, extra_params
 
-
-
-
-
 if __name__ == '__main__':
     import matplotlib
     matplotlib.use('module://backend_interagg')
