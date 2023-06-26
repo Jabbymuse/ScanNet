@@ -1,10 +1,12 @@
 # Module to construct the K closest neighbors (eigenvectors) of each amino_acids (local vectors included)
 import numpy as np
 from collections import defaultdict as dd
+import tensorflow as tf
+
 def Neighborhood_motion(file,indexes,m):
-    """Compute Neighborhood regarding indexes of the K closest vectors
-       indexes is a dictionnary of list containing labels of neighbors of the key-labeled amino_acid
-       m is the number of motions """
+    """Compute the Neighborhood graph of the K closest vectors for each amino_acid.
+       indexes is a dictionnary of list containing labels of neighbors of each key-labeled amino_acid.
+       m is the number of motions."""
 
     # to start with, we compute each amino_acids and their bound vectors
     f = open(file,'r')
@@ -28,11 +30,14 @@ def Neighborhood_motion(file,indexes,m):
         for label in indexes[index]: # list of indexes of the K-closest neighbors (itself included)
             neighborhood.append(amino_acids[label])
         G.append(neighborhood)
-    return G
+    f.close()
+    return tf.convert_to_tensor(G,dtype=tf.float64)
 
+"""
 # tests
 dic = dd(list)
 for i in range(102):
     dic[i] = list(range(16))
 
-Neighborhood_motion("pdb1b9e_rtb.txt",dic,10)
+G = Neighborhood_motion("motion_data/pdb1b9e_rtb.txt", dic, 10)
+"""
