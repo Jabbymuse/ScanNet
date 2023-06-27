@@ -2,16 +2,17 @@
 import numpy as np
 from collections import defaultdict as dd
 import tensorflow as tf
+tf.compat.v1.disable_v2_behavior()
 
 def Neighborhood_motion(file,indexes,m):
     """Compute the Neighborhood graph of the K closest vectors for each amino_acid.
-       indexes is a dictionnary of list containing labels of neighbors of each key-labeled amino_acid.
+       indexes is a tensor (shape ? * Naa * ? (K) * 1) containing labels of neighbors of each key-labeled amino_acid.)
        m is the number of motions."""
 
-    # to start with, we compute each amino_acids and their bound vectors
+    # to start with, we compute each amino_acids and their bonded vectors
     f = open(file,'r')
     line = f.readline()
-    amino_acids = dd(list)
+    indexes = tf.reshape(indexes[0], shape=(indexes.shape[1], indexes.shape[2])) # Naa * ? (K)
     while line != "":
         line = line.replace("\n","")
         line = line.split("  ")
@@ -20,24 +21,39 @@ def Neighborhood_motion(file,indexes,m):
             i += 1
         index = int(line[i]) # index of the current amino_acid
         i += 3 # jump the center of mass
-        for j in range(m):
-            amino_acids[index].append(list(map(float,[line[k] for k in range(i+1+6*j,i+7+6*j)])))
+        line_aa = tf.convert_to_tensor([list(map(float,[line[k] for k in range(i+1,i+7)]))]) # motions for a specific aa (m * 6)
+        for j in range(1,m):
+            line_aa = tf.concat([line_aa,tf.convert_to_tensor([list(map(float,[line[k] for k in range(i+1+6*j,i+7+6*j)]))])],axis=0)
+        if index == 0:
+            amino_acids = tf.convert_to_tensor([line_aa]) # creation of a line of neighbors
+        else:
+            amino_acids = tf.concat([amino_acids,tf.convert_to_tensor([line_aa])],axis=0) # filling
         line = f.readline()
     # now, we just create the graph matrix
-    G = []
-    for index in amino_acids.keys(): # amino_acid per amino_acid
-        neighborhood = []
-        for label in indexes[index]: # list of indexes of the K-closest neighbors (itself included)
-            neighborhood.append(amino_acids[label])
-        G.append(neighborhood)
     f.close()
-    return tf.convert_to_tensor(G,dtype=tf.float64)
+    G = tf.gather(amino_acids,indexes) # create the graph
+    return G
 
-"""
-# tests
-dic = dd(list)
-for i in range(102):
-    dic[i] = list(range(16))
+def Alignement(Graph,frames):
+    """Compute the local alignment of eigenvectors
+       Returns an aligned graph
+       Graph is the Neighborhood Graph (Tensor of shape Naa * K * m * 6)
+       Frames contains the local frames of amino_acids (Tensor of shape (Naa * 4 * 3)
+    """
 
-G = Neighborhood_motion("motion_data/pdb1b9e_rtb.txt", dic, 10)
-"""
+    # note for the future : if a batch dimension is added, some reshape might help to handle it.
+    
+    for i in range(Graph.shape[0]):
+
+        neighborhood = Graph[i][1:] # we convert every neighbor vector in (v,w)
+        neighborhood = tf.reshape(neighborhood, shape=(-1, 3, 1)) # (K*m*2) * 3
+
+        R = frames[i][1:]# creation of the matrix
+        neighborhood = tf.linalg.matmul(R, neighborhood)
+        neighborhood = tf.squeeze(neighborhood, axis=-1) # retire the extra_dimension
+        neighborhood = tf.reshape(neighborhood,shape = (Graph.shape[1]-1,Graph.shape[2],6)) # K * m * 6
+
+        new_neighborhood = tf.concat([tf.expand_dims(Graph[i][0],axis=0),neighborhood],axis=0) # new neighborhood of aa
+
+        Graph = tf.tensor_scatter_nd_update(Graph, indices=[[i]], updates=[new_neighborhood]) # update of the graph
+    return Graph
