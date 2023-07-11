@@ -6,7 +6,7 @@ References:
 """
 # Tensorflow version
 import tensorflow as tf
-from layers.mlp import MLP
+from layers_signnet.mlp import MLP
 
 class GINConv(tf.keras.layers.Layer):
     def __init__(self,apply_func=None,aggregator_type='sum',init_eps=0,learn_eps=False,activation=None):
@@ -18,13 +18,13 @@ class GINConv(tf.keras.layers.Layer):
             raise KeyError(
                 'Aggregator type {} not recognized (cf not sum).'.format(aggregator_type))
         if learn_eps:
-            self.eps = tf.Variable([init_eps], dtype=tf.float64) # if trainable
+            self.eps = tf.Variable([init_eps], dtype=tf.float32) # if trainable
         else:
-            self.eps = tf.constant([init_eps], dtype=tf.float64)
+            self.eps = tf.constant([init_eps], dtype=tf.float32)
 
     def call(self,g,x):
         if self.aggregator_type == 'sum':
-            aggregated = tf.reduce_sum(g, axis=1) # sum aggregation (center included) of neighbours, watch out axis value
+            aggregated = tf.reduce_sum(g, axis=2) # sum aggregation (center included) of neighbours, watch out axis value (fix it on the neighbors axis)
         else:
             raise ValueError('Aggregator type {} not recognized.'.format(self.aggregator_type))
         aggregated += self.eps * x

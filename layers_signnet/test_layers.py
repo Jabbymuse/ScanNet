@@ -5,7 +5,7 @@
 from gin import GINConv
 import tensorflow as tf
 tf.compat.v1.enable_eager_execution() # to print tensors
-
+"""
 # Torch stuff
 import torch as th
 import dgl
@@ -35,7 +35,7 @@ g = tf.convert_to_tensor(G,dtype=tf.float64)
 conv = GINConv(None,'sum',init_eps=0.5)
 res = conv(g,input)
 #print("res_Tens = ",res)
-
+"""
 """
 # Check with pytorch
 from dgl.nn.pytorch import GINConv as GINConv_t
@@ -45,7 +45,7 @@ conv_torch = GINConv_t(None,'sum',init_eps=0.5)
 #print(conv_torch(g_torch,input_torch))
 """
 
-
+"""
 # test of MLP
 # Tensorflow
 from mlp import MLP
@@ -81,7 +81,7 @@ from keras import initializers
 dense_layer = tf.keras.layers.Dense(units=6,kernel_initializer=initializers.glorot_uniform(seed=0)) # why expecting 0 weights ?????
 dense_layer.build(tf.TensorShape([4,2,6])) # because not build ...
 #print(dense_layer.get_weights())
-
+"""
 """
 class CustomDense(tf.keras.layers.Dense):
     def build(self, input_shapes:tf.TensorShape, param_values:np.array):
@@ -92,7 +92,7 @@ layer = CustomDense(units=6)
 layer.build(tf.TensorShape([4,2,6]),custom_weights)
 print("lw= ",layer.get_weights())
 """
-
+"""
 import torch.nn as nn
 th.manual_seed(0)
 in_channels = 6
@@ -127,12 +127,13 @@ with th.no_grad():
 #print(l(input_torch))
 
 # results have similar behaviours but remain diff
-
+"""
 
 # Tests of Siggnet architecture
 print("Test of Signnet Arch #####################################################################")
 
 #print(tf.__version__)
+import numpy as np
 from random import uniform as ru
 from random import choice as ch
 from network.signnet import GINDeepSigns as GIND
@@ -140,11 +141,13 @@ from network.signnet import GINDeepSigns as GIND
 Naa = 3 # nb of aa
 m = 2 # nb of motions (cf eigen vectors)
 K = 2
+B = 2 # batch dim
 
+# tests with simple values
 # we consider the K closest neighbors
-input = tf.convert_to_tensor([[[1 for _ in range(6)] for _ in range(m)] for _ in range(Naa)],dtype=tf.float64) # conversion to tensor
-G = [[[[1 for _ in range(6)] for _ in range(m)] for _ in range(K)] for i in range(Naa)]
-g = tf.convert_to_tensor(G,dtype=tf.float64)
+input = tf.convert_to_tensor([[[[1 for _ in range(6)] for _ in range(m)] for _ in range(Naa)] for _ in range(B)],dtype=tf.float32) # conversion to tensor
+G = [[[[[1 for _ in range(6)] for _ in range(m)] for _ in range(K)] for i in range(Naa)] for _ in range(B)]
+g = tf.convert_to_tensor(G,dtype=tf.float32)
 net = GIND(6,6,6,1,m)
 out = net(g,input)
 out2 = net(-g,-input)
@@ -152,29 +155,35 @@ out2 = net(-g,-input)
 #print(out == out2) # returns False interesting, while out - out2 is null Tensor...
 #print(out - out2)
 
-M_qq = [[[ru(5,-5) for _ in range(6)] for _ in range(m)] for _ in range(Naa)]
-input = tf.convert_to_tensor(M_qq,dtype=tf.float64)
-print(input)
+
+# tests with more specific values (cf real graph)
+M_qq = [[[[ru(5,-5) for _ in range(6)] for _ in range(m)] for _ in range(Naa)] for _ in range(B)]
+input = tf.convert_to_tensor(M_qq,dtype=tf.float32)
+#print(input)
 
 G = []
-for i in range(Naa):
-    l = [M_qq[i]] # each vector is its own neighbor
-    seq = list(range(Naa))
-    for _ in range(K-1):
-        index_v = ch(seq)
-        l.append(M_qq[index_v])
-    G.append(l)
+for b in range(B):
+    g = []
+    for i in range(Naa):
+        l = [M_qq[b][i]] # each vector is its own neighbor
+        seq = list(range(Naa))
+        for _ in range(K-1):
+            index_v = ch(seq)
+            l.append(M_qq[b][index_v])
+        g.append(l)
+    G.append(g)
 
-g = tf.convert_to_tensor(G,dtype=tf.float64)
-#print(g)
+g = tf.convert_to_tensor(G,dtype=tf.float32)
+#print("g=",g)
 
 out = net(g,input)
-#out2 = net(-g,-input)
+out2 = net(-g,-input)
 
-#print(out - out2)
+#print(out)
+print(out - out2)
 
 # Test of rot equivariance
-
+"""
 Rot = np.matrix([[1,0,0],
                [0,np.cos(0.3),-np.sin(0.3)],
                [0,np.sin(0.3),np.cos(0.3)]])
@@ -192,6 +201,7 @@ for i in range(Naa):
         M_qq[i][0][j] = M[j]
 
 print(M_qq)
+"""
 
 
 

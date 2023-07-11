@@ -275,8 +275,6 @@ if __name__ == '__main__':
         )
 
 
-
-
         #%% Train!
 
         extra_params['validation_data'] = (

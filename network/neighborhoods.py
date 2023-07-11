@@ -268,6 +268,7 @@ class LocalNeighborhood(Layer):
 
         neighbors = tf.expand_dims(tf.argsort(distance_square)[:, :, :self.Kmax], axis=-1)
 
+
         neighbors_attributes = [tf.gather_nd(
             attribute, neighbors, batch_dims=1) for attribute in second_attributes]
 

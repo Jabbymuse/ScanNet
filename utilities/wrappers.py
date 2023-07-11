@@ -38,7 +38,7 @@ def truncate_list_of_arrays(arrays, Ls):
         else:
             return np.array([array[:Ls] for array in arrays])
 
-def load_model(location, Lmax=None,load_weights=True):
+def load_model(location, Lmax=None,load_weights=True, with_vectors=False):
     pickle_location = location + '.data'
     env = io_utils.load_pickle(pickle_location)
     backend = env['backend']
@@ -54,6 +54,7 @@ def load_model(location, Lmax=None,load_weights=True):
         model_args = env['model_args']
         model_kwargs = env['model_kwargs']
         weights_location = location + '.h5'
+
 
         if (Lmax is not None):
             for keyword in model_kwargs.keys():
@@ -75,6 +76,12 @@ def load_model(location, Lmax=None,load_weights=True):
 
                 wrapper_builder_kwargs['Lmaxs'] = Lmaxs
 
+        """ # cf new_model 
+        if with_vectors:  # vectors added
+            Lmaxs.insert(2,Lmaxs[1]) # nb of vectors max
+            Lmaxs_training.insert(2,Lmaxs_training[1]) # idem for training
+            wrapper_builder_kwargs['input_type'].insert(2,'vectors')
+        """
 
         model = wrapper_builder(
             model_builder, *model_args, **model_kwargs, backend=backend, **wrapper_builder_kwargs)
@@ -295,13 +302,18 @@ class grouped_Predictor_wrapper(Predictor_wrapper):
         if multi_valued:
             ninputs = len(inputs)
             grouped_inputs = []
+            """ cf new input_type and Lmax
+            if len(inputs) == 9: # vector case (cf 8 -> 9)
+                input_types.insert(2,'attributes') # ['triplets','attributes','attributes',...]
+                self.Lmax.insert(2,self.Lmax[1])
+            """
             for n in range(ninputs):
                 if isinstance(self.Lmax,list):
                     Lmax = self.Lmax[n]
                 else:
                     Lmax = self.Lmax
-                input_type = input_types[n]
                 input_ = inputs[n]
+                input_type = input_types[n]
                 grouped_input = np.zeros([ngroups,Lmax]+list(input_[0].shape[1:]),dtype=input_[0].dtype)
                 if input_type in ['indices','triplets']:
                     grouped_input += -1
@@ -315,7 +327,7 @@ class grouped_Predictor_wrapper(Predictor_wrapper):
                             if input_type == 'frames':
                                 grouped_input[k,start:end,0,:] += count * self.big_distance
                             elif input_type =='points':
-                                grouped_input[k,start:end] += count * self.big_distance
+                                grouped_input[k,start:end] += count * int(self.big_distance)
                             elif input_type == 'indices':
                                 if count>0:
                                     grouped_input[k,start:end] += grouped_input[k,start-1] + self.big_sequence_distance
@@ -423,7 +435,7 @@ class grouped_Predictor_wrapper(Predictor_wrapper):
 
 
         if self.verbose:
-            print('Grouped %s examples in %s groups'%(len(Ls),len(groups)) )
+            print('Grouped %s examples in %s groups'%(len(Ls),len(groups)))
         if self.verbose:
             print('Grouping and padding...')
         grouped_inputs = self.group_and_padd(inputs,groups)

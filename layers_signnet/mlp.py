@@ -1,6 +1,5 @@
 import tensorflow as tf
 from keras import initializers
-tf.compat.v1.enable_eager_execution()
 class MLP(tf.keras.Model):
     def __init__(self, in_channels, hidden_channels, out_channels, num_layers, use_bn=False, use_ln=False, dropout=0.5, activation='relu', residual=False):
         super(MLP, self).__init__()

@@ -6,13 +6,12 @@ tf.compat.v1.disable_v2_behavior()
 
 def Neighborhood_motion(file,indexes,m):
     """Compute the Neighborhood graph of the K closest vectors for each amino_acid.
-       indexes is a tensor (shape ? * Naa * ? (K) * 1) containing labels of neighbors of each key-labeled amino_acid.)
+       indexes is a tensor (shape  Naa * ? (K)) containing labels of neighbors of each key-labeled amino_acid.)
        m is the number of motions."""
 
     # to start with, we compute each amino_acids and their bonded vectors
     f = open(file,'r')
     line = f.readline()
-    indexes = tf.reshape(indexes[0], shape=(indexes.shape[1], indexes.shape[2])) # Naa * ? (K)
     while line != "":
         line = line.replace("\n","")
         line = line.split("  ")
@@ -34,6 +33,7 @@ def Neighborhood_motion(file,indexes,m):
     G = tf.gather(amino_acids,indexes) # create the graph
     return G
 
+
 def Alignement(Graph,frames):
     """Compute the local alignment of eigenvectors
        Returns an aligned graph
@@ -42,18 +42,18 @@ def Alignement(Graph,frames):
     """
 
     # note for the future : if a batch dimension is added, some reshape might help to handle it.
-    
+
     for i in range(Graph.shape[0]):
 
-        neighborhood = Graph[i][1:] # we convert every neighbor vector in (v,w)
+        neighborhood = Graph[i] # we convert every neighbor vector in (v,w)
         neighborhood = tf.reshape(neighborhood, shape=(-1, 3, 1)) # (K*m*2) * 3
 
         R = frames[i][1:]# creation of the matrix
         neighborhood = tf.linalg.matmul(R, neighborhood)
         neighborhood = tf.squeeze(neighborhood, axis=-1) # retire the extra_dimension
-        neighborhood = tf.reshape(neighborhood,shape = (Graph.shape[1]-1,Graph.shape[2],6)) # K * m * 6
+        new_neighborhood = tf.reshape(neighborhood,shape = (Graph.shape[1],Graph.shape[2],6)) # K * m * 6
 
-        new_neighborhood = tf.concat([tf.expand_dims(Graph[i][0],axis=0),neighborhood],axis=0) # new neighborhood of aa
+        #new_neighborhood = tf.concat([tf.expand_dims(Graph[i][0],axis=0),neighborhood],axis=0) # new neighborhood of the aa
 
         Graph = tf.tensor_scatter_nd_update(Graph, indices=[[i]], updates=[new_neighborhood]) # update of the graph
     return Graph
