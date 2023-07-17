@@ -139,8 +139,8 @@ from random import choice as ch
 from network.signnet import GINDeepSigns as GIND
 
 Naa = 3 # nb of aa
-m = 2 # nb of motions (cf eigen vectors)
-K = 2
+m = 5 # nb of motions (cf eigen vectors)
+K = 4
 B = 2 # batch dim
 
 # tests with simple values
@@ -180,7 +180,20 @@ out = net(g,input)
 out2 = net(-g,-input)
 
 #print(out)
-print(out - out2)
+#print(out - out2)
+
+# tests minus for phi
+# sign flip on a specific ith motion
+g_minus = tf.expand_dims(tf.multiply(g[:,:,:,1,:], -1),axis=3)
+g_minus = tf.concat([g[:, :, :, :1, :], g_minus, g[:, :, :, 2:, :]], axis=3)
+
+#print(g+g_minus)
+
+input_minus = tf.expand_dims(tf.multiply(input[:,:,1,:], -1),axis=2)
+input_minus = tf.concat([input[:, :, :1, :], input_minus, input[:, :, 2:, :]], axis=2)
+out3 = net(g_minus,input_minus)
+
+#print(out-out3)
 
 # Test of rot equivariance
 """
