@@ -708,6 +708,7 @@ class ScanNetPipeline(Pipeline):
                  with_atom=True,
                  aa_features='sequence',
                  atom_features='valency',
+                 motion_vectors=False, # False, or the number of modes to keep (e.g., 10).
                  Beff=500,
                  aa_frames='triplet_sidechain',
                  padded=False,
@@ -750,6 +751,7 @@ class ScanNetPipeline(Pipeline):
 
         self.aa_features = aa_features
         self.atom_features = atom_features
+        self.motion_vectors = motion_vectors
 
         assert aa_frames in ['triplet_sidechain','triplet_cbeta','triplet_backbone','quadruplet']
         self.aa_frames = aa_frames
@@ -770,8 +772,8 @@ class ScanNetPipeline(Pipeline):
                         atomic_coordinates=None,
                         atom_ids=None,
                         PWM=None,
+                        aa_motion_vectors=None,
                         labels=None,
-                        motion_vectors=None,
                         *kwargs
                         ):
 
@@ -830,20 +832,23 @@ class ScanNetPipeline(Pipeline):
             # print('Computed aa frame cloud, seqlength:%s, MSA_file:%s' % (len(sequence), MSA_file))
 
             # compuation of aa_motion_vectors
-            aa_motion_vectors = motion_vectors # nd_array with shape (Naa,m*6)
+            if bool(self.motion_vectors) & (aa_motion_vectors is None):
+                aa_motion_vectors = PDB_processing.apply_NOLB(chain_obj,sequence_lengths = [len(sequence)],m=self.motion_vectors) # nd_array with shape (Naa,m*6)
 
             if self.padded:
                 aa_clouds = padd_matrix(aa_clouds, padding_value=0, Lmax=self.Lmax_aa_points)
                 aa_triplets = padd_matrix(aa_triplets, padding_value=-1, Lmax=self.Lmax_aa)
                 aa_attributes = padd_matrix(aa_attributes, padding_value=0, Lmax=self.Lmax_aa)
                 aa_indices = padd_matrix(aa_indices, padding_value=-1, Lmax=self.Lmax_aa)
-                aa_motion_vectors = padd_matrix(aa_motion_vectors, padding_value=0., Lmax=self.Lmax_aa)
+                if self.motion_vectors:
+                    aa_motion_vectors = padd_matrix(aa_motion_vectors, padding_value=0., Lmax=self.Lmax_aa)
             else:
                 aa_clouds = remove_nan(aa_clouds,padding_value=0.)
                 aa_triplets = remove_nan(aa_triplets, padding_value=-1)
                 aa_attributes = remove_nan(aa_attributes, padding_value=0.)
                 aa_indices = remove_nan(aa_indices, padding_value=-1 )
-                aa_motion_vectors = remove_nan(aa_motion_vectors, padding_value=0.)
+                if self.motion_vectors:
+                    aa_motion_vectors = remove_nan(aa_motion_vectors, padding_value=0.)
 
 
         if self.with_atom:
@@ -877,7 +882,10 @@ class ScanNetPipeline(Pipeline):
 
         inputs = []
         if self.with_aa:
-            inputs += [aa_triplets, aa_attributes,aa_motion_vectors, aa_indices,aa_clouds]
+            if self.motion_vectors:
+                inputs += [aa_triplets, aa_attributes,aa_motion_vectors, aa_indices,aa_clouds]
+            else:
+                inputs += [aa_triplets, aa_attributes, aa_indices, aa_clouds]
 
         if self.with_atom:
             inputs += [atom_triplets,atom_attributes,atom_indices,atom_clouds]

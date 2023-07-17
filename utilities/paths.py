@@ -6,6 +6,9 @@ structures_folder = library_folder + 'PDB/' # Where pdb/mmCIF structures files a
 predictions_folder = library_folder + 'predictions/' # Output folder.
 model_folder = library_folder + 'models/' # Where the networks as stored as pairs of files (.h5,.data).
 
+# Path to NOLB
+path_to_nolb = library_folder + 'motion/NOLB_mac'
+
 # Additional paths required for prediction with evolutionary information.
 MSA_folder = library_folder + 'MSA/' # Where multiple sequence alignments are stored.
 path2hhblits = None # Path to hhblits binary. Not required if using ScanNet_noMSA networks.

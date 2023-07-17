@@ -3,7 +3,8 @@ from keras.layers import Input, Dense, Masking, TimeDistributed, Concatenate, Ac
 from keras.initializers import Zeros, Ones, RandomUniform
 import numpy as np
 import keras.regularizers
-from . import neighborhoods_modif, attention, embeddings, utils
+from . import attention, embeddings, utils
+from . import neighborhoods_modif as neighborhoods
 from functools import partial
 import keras.backend as K
 import tensorflow as tf
@@ -122,7 +123,7 @@ def neighborhood_embedding(
         scale='atom',
         return_frames=False):
     # Build frames.
-    frames = neighborhoods_modif.FrameBuilder(name='frames_%s' % scale,
+    frames = neighborhoods.FrameBuilder(name='frames_%s' % scale,
                                         order=order_frame,
                                         # The permutation to build the frame (for order ='2', the zaxis is defined from X_1 -> X_3).
                                         dipole=dipole_frame
@@ -140,20 +141,17 @@ def neighborhood_embedding(
             input2localneighborhood = [frames] + attributes
         else:
             input2localneighborhood = [frames, attributes]
+
+    local_values = neighborhoods.LocalNeighborhood(Kmax=Kmax,
+                                                                      coordinates=coordinates,
+                                                                      index_distance_max=index_distance_max,
+                                                                      nrotations=nrotations,
+                                                                      name='neighborhood_%s' % scale)(
+    input2localneighborhood,vectors=vectors)
     if vectors:
-        local_coordinates, local_attributes, graph_aligned_vectors = neighborhoods_modif.LocalNeighborhood(Kmax=Kmax,
-                                                                          coordinates=coordinates,
-                                                                          index_distance_max=index_distance_max,
-                                                                          nrotations=nrotations,
-                                                                          name='neighborhood_%s' % scale)(
-        input2localneighborhood,vectors=vectors)
+        local_coordinates, local_attributes, graph_aligned_vectors = local_values
     else:
-        local_coordinates, local_attributes = neighborhoods_modif.LocalNeighborhood(Kmax=Kmax,
-                                                                                    coordinates=coordinates,
-                                                                                    index_distance_max=index_distance_max,
-                                                                                    nrotations=nrotations,
-                                                                                    name='neighborhood_%s' % scale)(
-            input2localneighborhood)
+        local_coordinates, local_attributes = local_values
 
 
     # Gaussian embedding of local coordinates.
@@ -263,8 +261,7 @@ def ScanNet(
         dropout=0.,
         optimizer='adam',
         output='classification',
-        m=10,
-        with_motion_vectors=False
+        motion_vectors=False  # False or number or number motion vectors.
 ):
     if frame_aa == 'triplet_backbone':
         order_aa = '3'
@@ -348,8 +345,8 @@ def ScanNet(
                              dtype="int32")  # List of triplet/quadruplet of the indices of the points for building the frames.
     attributes_aa = Input(shape=[Lmax_aa, nfeatures_aa], name='attributes_aa',
                           dtype="float32")  # The attributes of the amino acids (PWM/ one-hot encoded sequence).
-    if with_motion_vectors:
-        attributes_motion_aa = Input(shape=[Lmax_aa, m, 6], name='attributes_motion_aa',
+    if motion_vectors:
+        attributes_motion_aa = Input(shape=[Lmax_aa, motion_vectors, 6], name='attributes_motion_aa',
                                  dtype="float32")  # motion vectors for each amino acid
     sequence_indices_aa = Input(shape=[Lmax_aa, 1], name='sequence_indices_aa',
                                 dtype="int32")  # The position of each amino acid on the sequence.
@@ -359,7 +356,7 @@ def ScanNet(
     # Same, after masking.
     masked_frame_indices_aa = Masking(mask_value=-1, name='masked_frame_indices_aa')(frame_indices_aa)
     masked_attributes_aa = Masking(mask_value=0.0, name='masked_attributes_aa')(attributes_aa)
-    if with_motion_vectors:
+    if motion_vectors:
         masked_attributes_motion_aa = Masking(mask_value=0.0, name='masked_attributes_motion_aa')(attributes_motion_aa)
     masked_sequence_indices_aa = Masking(mask_value=-1, name='masked_sequence_indices_aa')(sequence_indices_aa)
     masked_point_clouds_aa = Masking(mask_value=0.0, name='masked_point_clouds_aa')(point_clouds_aa)
@@ -444,7 +441,7 @@ def ScanNet(
 
         # Build a binary bipartite graph from amino acid to atoms.
         # For each amino acid we look for the 14 closest atoms in terms of sequence distance.
-        pooling_mask, pooling_attention_local, pooling_features_local = neighborhoods_modif.LocalNeighborhood(Kmax=14,
+        pooling_mask, pooling_attention_local, pooling_features_local = neighborhoods.LocalNeighborhood(Kmax=14,
                                                                                                         coordinates=[
                                                                                                             'index_distance'],
                                                                                                         self_neighborhood=False,
@@ -473,7 +470,7 @@ def ScanNet(
         all_embedded_attributes_aa = Activation('linear', name='all_embedded_attributes_aa')(embedded_attributes_aa)
 
     # Compute embeddings of amino acid neighborhoods.
-    if with_motion_vectors:
+    if motion_vectors:
         SCAN_filters_aa, frames_aa, graph_aligned_vectors = neighborhood_embedding(
             masked_point_clouds_aa,
             masked_frame_indices_aa,
@@ -524,25 +521,24 @@ def ScanNet(
         aligned_vectors = graph_aligned_vectors[:, :, 0]  # first column of each file
         signed_vectors = SignNet(graph_aligned_vectors,aligned_vectors)
     """
-    if with_motion_vectors:
-        signed_vectors = graph_aligned_vectors[:,:,0]
-        # Embedding of motion_attributes
-        embedded_attributes_motion_aa = attribute_embedding(tf.reshape(signed_vectors,shape=[-1,1024,160]), m*6, activation,name='embedded_attributes_motion_aa')
-
-
-
     if dropout > 0:
         SCAN_filters_aa = Dropout(dropout, noise_shape=(
             None, 1, None), name='dropout')(SCAN_filters_aa)
 
-    embedded_filter = SCAN_filters_aa
+    if motion_vectors:
+        signed_vectors = Lambda(lambda x: tf.reshape(x[:,:,0], shape=[-1,Lmax_aa,motion_vectors*6]) )(graph_aligned_vectors)
+        # Embedding of motion_attributes
+        embedded_attributes_motion_aa = attribute_embedding(signed_vectors, 8, activation,name='embedded_attributes_motion_aa')
+        embedded_filter = Concatenate(name='ScanNet_filters_aa-embedded_attributes_motion_aa', axis=-1)([SCAN_filters_aa, embedded_attributes_motion_aa])
+    else:
+        embedded_filter = SCAN_filters_aa
     if filter_MLP:
         for k, n_feature_filter in enumerate(filter_MLP):
             embedded_filter = attribute_embedding(embedded_filter, n_feature_filter, activation,
                                                   name='SCAN_filters_aa_embedded_%s' % (k + 1))
 
     # Concatenation before attention and classification
-    if with_motion_vectors:
+    if motion_vectors:
         embedded_filter = Concatenate(name='embedded_filter', axis=-1)([embedded_filter,embedded_attributes_motion_aa])
 
     # Final graph attention layer. Propagates label information from "hotspots" to passengers to obtain spatially consistent labels.
@@ -569,7 +565,7 @@ def ScanNet(
         nattentionheads_graph * nfilters_graph, activation=node_features_activation, use_bias=True),
         name='node_output')(embedded_filter)
 
-    graph_weights, attention_local, node_features_local = neighborhoods_modif.LocalNeighborhood(
+    graph_weights, attention_local, node_features_local = neighborhoods.LocalNeighborhood(
         Kmax=K_graph, coordinates=coordinates_graph,
         index_distance_max=index_distance_max_graph, name='neighborhood_graph')(
         [frames_aa, masked_sequence_indices_aa, cross_attention, node_features])
@@ -597,7 +593,7 @@ def ScanNet(
     inputs = [frame_indices_aa, attributes_aa, sequence_indices_aa, point_clouds_aa]
     if with_atom:
         inputs += [frame_indices_atom, attributes_atom, sequence_indices_atom, point_clouds_atom]
-    if with_motion_vectors:
+    if motion_vectors:
         inputs.insert(2,attributes_motion_aa)
 
     model = Model(inputs=inputs,
@@ -622,7 +618,7 @@ def initialize_ScanNet(
         K_aa=16,
         K_atom=16,
         K_graph=32,
-        Dmax_aa=13.,
+        Dmax_aa=11.,
         Dmax_atom=4.,
         Dmax_graph=13.,
         N_aa=32,
@@ -648,7 +644,7 @@ def initialize_ScanNet(
         coordinates_aa=['euclidian'],
         frame_aa='triplet_sidechain',
         coordinates_graph=['distance', 'ZdotZ', 'ZdotDelta', 'index_distance'],
-        index_distance_max_graph=16,
+        index_distance_max_graph=8,
         nrotations=1,
         l1_aa=0.,
         l12_aa=0.,
@@ -668,8 +664,8 @@ def initialize_ScanNet(
         n_init=10,
         epochs=100,
         batch_size=1,
-        with_motion_vectors=False,
-        m=10):
+        motion_vectors=False # Either False or the number of motion vectors
+):
     Lmax_atom = 9 * Lmax_aa
     if frame_aa == 'triplet_backbone':
         Lmax_aa_points = Lmax_aa + 2
@@ -688,7 +684,7 @@ def initialize_ScanNet(
     else:
         input_type = ['triplets', 'attributes', 'indices', 'points']
         Lmaxs = [Lmax_aa, Lmax_aa, Lmax_aa, Lmax_aa_points]
-    if with_motion_vectors:
+    if motion_vectors:
         input_type.insert(2,'attributes')
         Lmaxs.insert(2,Lmax_aa)
 
@@ -720,40 +716,27 @@ def initialize_ScanNet(
     except:
         print(
             'Initializing the Gaussian kernels for the amino acid neighborhood (takes a few minutes to do it robustly, be patient!)  Reduce n_init from 10 to 1 if speed needed')
-        if with_motion_vectors:
-            initial_values['GaussianKernel_aa'] = neighborhoods_modif.initialize_GaussianKernel_for_NeighborhoodEmbedding(
-                [inputs[0], inputs[4]],
-                N_aa,
-                covariance_type_aa,
-                neighborhood_params={'Kmax': K_aa,
-                                     'coordinates': coordinates_aa,
-                                     'nrotations': nrotations,
-                                     'index_distance_max': None,
-                                     'self_neighborhood': True,
-                                     },
-                n_samples=100,
-                Dmax=Dmax_aa, padded=False, from_triplets=True, order=order_aa, dipole=dipole_aa, n_init=n_init)
-        else: # version without vectors
-            initial_values[
-                'GaussianKernel_aa'] = neighborhoods_modif.initialize_GaussianKernel_for_NeighborhoodEmbedding(
-                [inputs[0], inputs[3]],
-                N_aa,
-                covariance_type_aa,
-                neighborhood_params={'Kmax': K_aa,
-                                     'coordinates': coordinates_aa,
-                                     'nrotations': nrotations,
-                                     'index_distance_max': None,
-                                     'self_neighborhood': True,
-                                     },
-                n_samples=100,
-                Dmax=Dmax_aa, padded=False, from_triplets=True, order=order_aa, dipole=dipole_aa, n_init=n_init)
+        if motion_vectors:
+            inputs_ = [inputs[0],inputs[4]]
+        else:
+            inputs_ = [inputs[0], inputs[3]]
+        initial_values['GaussianKernel_aa'] = neighborhoods.initialize_GaussianKernel_for_NeighborhoodEmbedding(
+            inputs_,
+            N_aa,
+            covariance_type_aa,
+            neighborhood_params={'Kmax': K_aa,
+                                 'coordinates': coordinates_aa,
+                                 'nrotations': nrotations,
+                                 'index_distance_max': None,
+                                 'self_neighborhood': True,
+                                 },
+            n_samples=100,
+            Dmax=Dmax_aa, padded=False, from_triplets=True, order=order_aa, dipole=dipole_aa, n_init=n_init)
         if save_initial_values:
             io_utils.save_pickle(
                 {'GaussianKernel_aa': initial_values['GaussianKernel_aa']}, location_aa)
 
     if with_atom:
-        print(
-            'Initializing the Gaussian kernels for the atomic neighborhood (takes a few minutes to do it robustly, be patient!). Reduce n_init from 10 to 1 if speed needed')
         c_atom = ''.join([c[0] for c in coordinates_atom])
         location_atom = initial_values_folder + 'initial_GaussianKernel_atom_N_%s_Kmax_%s_Dmax_%s_frames_%s_coords_%s_nrotations_%s_cov_%s_tripletsorder_%s_dipole_%s.data' % (
             N_atom, K_atom, Dmax_atom, frame_atom, c_atom, 1, covariance_type_atom, order_atom, dipole_atom)
@@ -763,11 +746,20 @@ def initialize_ScanNet(
             initial_values['GaussianKernel_atom'] = io_utils.load_pickle(location_atom)[
                 'GaussianKernel_atom']
         except:
+            print(
+                'Initializing the Gaussian kernels for the atomic neighborhood (takes a few minutes to do it robustly, be patient!). Reduce n_init from 10 to 1 if speed needed')
             if 'index_distance' in coordinates_atom:
-                inputs_ = [inputs[5], inputs[8], inputs[7]] # idem décalage de 1 vers la droite dès que >= 2
+                if motion_vectors:
+                    inputs_ = [inputs[5], inputs[8], inputs[7]]  # idem décalage de 1 vers la droite dès que >= 2
+                else:
+                    inputs_ = [inputs[4], inputs[7], inputs[6]]
             else:
-                inputs_ = [inputs[5], inputs[8]]
-            initial_values['GaussianKernel_atom'] = neighborhoods_modif.initialize_GaussianKernel_for_NeighborhoodEmbedding(
+                if motion_vectors:
+                    inputs_ = [inputs[5], inputs[8]]
+                else:
+                    inputs_ = [inputs[4], inputs[7]]
+
+            initial_values['GaussianKernel_atom'] = neighborhoods.initialize_GaussianKernel_for_NeighborhoodEmbedding(
                 inputs_,
                 N_atom,
                 covariance_type_atom,
@@ -793,8 +785,12 @@ def initialize_ScanNet(
     except:
         print(
             'Initializing the Gaussian and dense kernels for the graph neighborhood (takes a few minutes to do it robustly, be patient!)  Reduce n_init from 10 to 1 if speed needed')
-        initial_values_graph = neighborhoods_modif.initialize_Embedding_for_NeighborhoodAttention(
-            [inputs[0], inputs[4], inputs[3]], outputs, # idem décalage de 1 si >= 2
+        if motion_vectors:
+            inputs_ = [inputs[0], inputs[4], inputs[3]]
+        else:
+            inputs_ = [inputs[0], inputs[3], inputs[2]]
+        initial_values_graph = neighborhoods.initialize_Embedding_for_NeighborhoodAttention(
+            inputs_, outputs, # idem décalage de 1 si >= 2
             neighborhood_params={'Kmax': K_graph,
                                  'coordinates': coordinates_graph,
                                  'index_distance_max': index_distance_max_graph,
@@ -862,7 +858,7 @@ def initialize_ScanNet(
                                                output=output,
                                                multi_inputs=True,
                                                multi_outputs=False,
-                                               with_motion_vectors=with_motion_vectors,
+                                               motion_vectors=motion_vectors,
                                                )
     extra_params = {'epochs': epochs, 'batch_size': batch_size}
     return model, extra_params

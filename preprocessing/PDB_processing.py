@@ -7,7 +7,7 @@ from scipy.linalg import eigh
 from Bio.PDB import Selection
 from Bio.PDB.ResidueDepth import _read_vertex_array, _get_atom_radius
 import tempfile
-from utilities.paths import structures_folder,path_to_dssp,path_to_msms
+from utilities.paths import structures_folder,path_to_dssp,path_to_msms,path_to_nolb
 from preprocessing.protein_chemistry import list_atoms,list_atoms_types,VanDerWaalsRadii,atom_mass,atom_type_to_index,atom_to_index,index_to_type,atom_type_mass
 from preprocessing.protein_chemistry import residue_dictionary,hetresidue_field
 from preprocessing import PDBio
@@ -227,14 +227,7 @@ def find_nearby_interface_residues(interface_residues, structure):
         return np.array([])
 
 
-
-
-
-#%% Handcrafted geometrical features.
-
-def apply_DSSP(chain_obj, pdbparser=None, io=None, path_to_dssp=path_to_dssp):
-    if pdbparser is None:
-        pdbparser = Bio.PDB.PDBParser()  # PDB parser; to read pdb files.
+def write_chains(chain_obj, filename, io=None):
     if io is None:
         # PDB IO. To compute solvent accessibility, need to write a PDB file with only the monomers...
         io = Bio.PDB.PDBIO()
@@ -267,14 +260,21 @@ def apply_DSSP(chain_obj, pdbparser=None, io=None, path_to_dssp=path_to_dssp):
     for residue in Selection.unfold_entities(io.structure,'R'):
         for atom in residue:
             atom.disordered_flag = 0
+    io.save(filename)
+    return filename
 
+
+
+#%% Handcrafted geometrical features.
+
+def apply_DSSP(chain_obj, pdbparser=None, io=None, path_to_dssp=path_to_dssp):
+    if pdbparser is None:
+        pdbparser = Bio.PDB.PDBParser()  # PDB parser; to read pdb files.
+    pdb_id, model, chain = chain_obj[0].get_full_id()
     hash = str(datetime.now())[-6:]
     name = 'tmp_' + pdb_id + \
         '_model_%s_chain_%s' % (model, chain) + '_'+hash + '.pdb'
-
-
-    io.save(name)
-
+    write_chains(chain_obj, name, io=None)
     with warnings.catch_warnings(record=True) as w:
         mini_structure = pdbparser.get_structure(name[:-4]  # name of structure
                                                  ,  name)
@@ -649,3 +649,28 @@ def NOLB_to_motion_vectors(aa_indices_lengths,motion_vectors_path,m):
             l += 1
         list_motion_vectors.append(motions)
     return list_motion_vectors
+
+def apply_NOLB(chain_objs, path_to_nolb = path_to_nolb,sequence_lengths = None,m=10):
+    if not isinstance(chain_objs,list):
+        chain_objs = [chain_objs]
+    if sequence_lengths is None:
+        sequence_lengths = [len(process_chain(chain_obj)[0]) for chain_obj in chain_objs]
+
+    hash = str(datetime.now())[-6:] + "{:06d}".format(np.random.randint(0,high=100000) )
+    # creation of file paths
+    input_pdb_file = os.path.join(structures_folder, f'tmp_{hash}.pdb')
+    inter_H_pdb_file = os.path.join(structures_folder, f'tmp_{hash}_H_reduced.pdb')
+    # inter_pdb_file = os.path.join(structures_folder, f'tmp_{hash}_pre_reduced.pdb')
+    output_pdb_file = os.path.join(structures_folder, f'tmp_{hash}_reduced.pdb')
+    motion_vectors_file = os.path.join(structures_folder, f'tmp_{hash}_reduced_rtb.txt')
+    motion_vectors_file2 = os.path.join(structures_folder, f'tmp_{hash}_reduced_rtb-mapping.txt')
+    write_chains(chain_objs, input_pdb_file)
+    supress_H(input_pdb_file,inter_H_pdb_file)
+    reduced_model(inter_H_pdb_file, output_pdb_file)
+    os.system(f"{path_to_nolb} {output_pdb_file} -f 2")  # file recorded with -rtb.txt name
+    list_motion_vectors = NOLB_to_motion_vectors(sequence_lengths, motion_vectors_file, m)
+    assert all([len(motion_vectors) == sequence_length for motion_vectors,sequence_length in zip(list_motion_vectors,sequence_lengths)])
+    motion_vectors = np.concatenate([np.array(motion_vectors) for motion_vectors in list_motion_vectors],axis=0)
+    for file in [input_pdb_file,inter_H_pdb_file,output_pdb_file,motion_vectors_file,motion_vectors_file2]:
+        os.system('rm %s' % file)
+    return motion_vectors
