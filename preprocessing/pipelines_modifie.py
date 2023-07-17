@@ -724,6 +724,8 @@ class ScanNetPipeline(Pipeline):
             aa_frames,
             Beff,
         )
+        if motion_vectors:
+            pipeline_name += '-motion-%s'% motion_vectors
         if padded:
             pipeline_name += '_padded-%s'%Lmax_aa
 

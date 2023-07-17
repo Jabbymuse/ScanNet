@@ -1,7 +1,7 @@
-import preprocessing.pipelines as pipelines
+import preprocessing.pipelines_modifie as pipelines
 import utilities.dataset_utils as dataset_utils
 import utilities.wrappers as wrappers
-import network.scannet as scannet
+import network.scannet_modif as scannet
 import pandas as pd
 import numpy as np
 import utilities.paths as paths
@@ -79,6 +79,7 @@ if __name__ == '__main__':
     train = True # True to retrain, False to evaluate the model shown in paper.
     use_evolutionary = False # True to use evolutionary information (requires hhblits and a sequence database), False otherwise.
     Lmax_aa = 256 if check else 1024
+    motion_vectors = 10 # False
     ''' 
     Maximum length of the protein sequences.
     Sequences longer than Lmax_aa are truncated, sequences shorter are grouped and processed using the protein serialization trick (see Materials and Methods of paper).
@@ -94,6 +95,8 @@ if __name__ == '__main__':
         model_name = 'ScanNet_PPI_retrained'
         if len(sys.argv)>1: # python train.py 1/2/...
             model_name += '_%s'%sys.argv[1] # Retrain multiple times for error bars.
+        if motion_vectors:
+            model_name += '_motion_%s' % motion_vectors
         if not use_evolutionary:
             model_name += '_noMSA'
         if check:
@@ -135,6 +138,7 @@ if __name__ == '__main__':
     pipeline = pipelines.ScanNetPipeline(
         with_atom=True,
         aa_features='pwm' if use_evolutionary else 'sequence',
+        motion_vectors = motion_vectors
     )
 
 
@@ -271,7 +275,7 @@ if __name__ == '__main__':
             initial_values_folder = paths.initial_values_folder,
             save_initial_values= False if check else True, # Cache the initial Gaussian kernels for next training.
             n_init=2, # Parameter for initializing the Gaussian kernels. Number of initializations for fitting the GMM model with sklearn. 10 were used for the paper.
-
+            motion_vectors=motion_vectors
         )
 
 
