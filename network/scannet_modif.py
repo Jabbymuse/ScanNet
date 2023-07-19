@@ -526,7 +526,10 @@ def ScanNet(
             None, 1, None), name='dropout')(SCAN_filters_aa)
 
     if motion_vectors:
-        signed_vectors = Lambda(lambda x: tf.reshape(x[:,:,0], shape=[-1,Lmax_aa,motion_vectors*6]) )(graph_aligned_vectors)
+        SignNet = signnet.GINDeepSigns(6, 6, 6, 1,motion_vectors)
+        signed_vectors = Lambda(lambda x : SignNet(None,g=x),input_shape=list(graph_aligned_vectors.shape))(
+            inputs=graph_aligned_vectors)
+        signed_vectors = Lambda(lambda x : tf.reshape(x,shape=[-1,Lmax_aa,10*6]))(signed_vectors)
         # Embedding of motion_attributes
         embedded_attributes_motion_aa = attribute_embedding(signed_vectors, 8, activation,name='embedded_attributes_motion_aa')
         embedded_filter = Concatenate(name='ScanNet_filters_aa-embedded_attributes_motion_aa', axis=-1)([SCAN_filters_aa, embedded_attributes_motion_aa])
