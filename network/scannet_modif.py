@@ -1,5 +1,5 @@
 from keras.models import Model
-from keras.layers import Input, Dense, Masking, TimeDistributed, Concatenate, Activation, Embedding, Dropout, Lambda
+from keras.layers import Input, Dense, Masking, TimeDistributed, Concatenate, Activation, Embedding, Dropout, Lambda,Reshape
 from keras.initializers import Zeros, Ones, RandomUniform
 import numpy as np
 import keras.regularizers
@@ -526,12 +526,9 @@ def ScanNet(
             None, 1, None), name='dropout')(SCAN_filters_aa)
 
     if motion_vectors:
-        SignNet = signnet.GINDeepSigns(6, 6, 6, 1,motion_vectors)
-        signed_vectors = Lambda(lambda x : SignNet(None,g=x),input_shape=list(graph_aligned_vectors.shape))(
-            inputs=graph_aligned_vectors)
-        signed_vectors = Lambda(lambda x : tf.reshape(x,shape=[-1,Lmax_aa,10*6]))(signed_vectors)
+        signed_vectors = signnet.GINDeepSigns(graph_aligned_vectors, None, 19, None, 2, None, use_bn=False, use_ln=False, dropout=0.5, activation='relu')
         # Embedding of motion_attributes
-        embedded_attributes_motion_aa = attribute_embedding(signed_vectors, 8, activation,name='embedded_attributes_motion_aa')
+        embedded_attributes_motion_aa = attribute_embedding(signed_vectors, 13, activation,name='embedded_attributes_motion_aa')
         embedded_filter = Concatenate(name='ScanNet_filters_aa-embedded_attributes_motion_aa', axis=-1)([SCAN_filters_aa, embedded_attributes_motion_aa])
     else:
         embedded_filter = SCAN_filters_aa

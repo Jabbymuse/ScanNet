@@ -396,7 +396,7 @@ class LocalNeighborhood(Layer):
     def compute_output_shape(self, input_shape):
         B = input_shape[0][0]
         Lmax = input_shape[0][1]
-        dim_attributes = [shape[-1] for shape in input_shape[-self.nattributes:]]
+        dim_attributes = [shape[2:] for shape in input_shape[-self.nattributes:]]
         if self.nrotations>1:
             output_shape = [(B, Lmax, self.Kmax, self.nrotations,self.coordinates_dimension)]
         else:
@@ -404,11 +404,11 @@ class LocalNeighborhood(Layer):
         for dim_attribute in dim_attributes:
             if self.nrotations>1:
                 output_shape.append(
-                    (B, Lmax, self.Kmax, 1, dim_attribute)
+                    (B, Lmax, self.Kmax, 1) + dim_attribute
                 )
             else:
                 output_shape.append(
-                    (B, Lmax, self.Kmax, dim_attribute)
+                    (B, Lmax, self.Kmax) + dim_attribute
                 )
         return output_shape
 
