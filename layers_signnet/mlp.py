@@ -1,6 +1,6 @@
 import tensorflow as tf
 from keras import initializers
-class MLP(tf.keras.Model):
+class MLP(tf.keras.layers.Layer):
     def __init__(self, in_channels, hidden_channels, out_channels, num_layers, use_bn=False, use_ln=False, dropout=0.5, activation='relu', residual=False):
         super(MLP, self).__init__()
         self.lins = []

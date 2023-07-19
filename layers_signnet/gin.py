@@ -22,7 +22,7 @@ class GINConv(tf.keras.layers.Layer):
         else:
             self.eps = tf.constant([init_eps], dtype=tf.float32)
 
-    def call(self,g,x):
+    def call(self,inputs,g=None, x=None):
         if self.aggregator_type == 'sum':
             aggregated = tf.reduce_sum(g, axis=2) # sum aggregation (center included) of neighbours, watch out axis value (fix it on the neighbors axis)
         else:
@@ -36,7 +36,7 @@ class GINConv(tf.keras.layers.Layer):
         return outputs
 
 
-class GIN(tf.keras.Model):
+class GIN(tf.keras.layers.Layer):
     def __init__(self, in_channels, hidden_channels, out_channels, n_layers, use_bn=True, dropout=0.5,activation='relu'):
         super(GIN, self).__init__()
         self.Layers = []
@@ -64,7 +64,7 @@ class GIN(tf.keras.Model):
 
         self.dropout = tf.keras.layers.Dropout(rate=dropout) # prevents overfitting
 
-    def call(self,g,x):
+    def call(self,inputs,g=None, x=None):
         for i, layer in enumerate(self.Layers):
             if i != 0:
                 x = self.dropout(x)
@@ -77,5 +77,5 @@ class GIN(tf.keras.Model):
                         x = tf.transpose(x, [0, 2, 1])
                     else:
                         raise ValueError('Invalid dimension of x')
-            x = layer(g,x)
+            x = layer(None,g=g,x=x)
         return x
