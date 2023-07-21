@@ -7,9 +7,9 @@ from keras.layers import Input, Dense, Masking, TimeDistributed, Concatenate, Ac
 from keras.initializers import Zeros, Ones, RandomUniform
 from . import embeddings
 
-def GINDeepSigns(input_graph, in_channels, hidden_channels, out_channels, num_layers, k, use_bn=False, use_ln=False, dropout=0.5, activation='relu'):
+def GINDeepSigns(input_graph, in_channels, hidden_channels, out_channels, num_layers, k, use_bn=False, use_ln=False, dropout=0.5, activation='relu',epsilon=0.5):
 
-    def init_MLP(layer_sizes=[64,32,16], use_bn=True, activation=None ):
+    def init_MLP(layer_sizes=[64,32,16], use_bn=True, activation=None):
         if activation == 'tanh':
             center = True
             scale = True
@@ -33,10 +33,38 @@ def GINDeepSigns(input_graph, in_channels, hidden_channels, out_channels, num_la
             list_layers.append(TimeDistributed(Dense(layer_size, use_bias=False, activation=None),
                                                 name='GIN_MLP_projection_%s'%k) )
             if use_bn:
-                list_layers.append( embeddings.MaskedBatchNormalization(
+                list_layers.append(embeddings.MaskedBatchNormalization(
                 epsilon=1e-3, axis=-1, center=center, scale=scale, name='GIN_MLP_normalization_%s'%k) )
-            list_layers.append( TimeDistributed(Activation(activation), name='GIN_MLP_activation_%s'%k) )
+            list_layers.append(TimeDistributed(Activation(activation), name='GIN_MLP_activation_%s'%k) )
         return list_layers
+
+    def update_graph(g,epsilon):
+        """ compute the aggregation and the update of the input graph g """
+        return tf.concat([tf.expand_dims(tf.reduce_sum(g,axis=2) + epsilon * g[:,:,0],axis=2),g[:,:,1:]],axis=2)
+
+    def init_GIN(epsilon,n_layers,layer_sizes=None,use_bn=True,activation=None,dropout=None):
+        """ first version without bn"""
+        Gin_layers = []
+        # input layer
+        update_layer = Lambda(update_graph,arguments={'epsilon':epsilon})
+        Gin_layers.append(update_layer)
+        MLP = init_MLP(layer_sizes=layer_sizes,use_bn=use_bn,activation=activation)
+        Gin_layers += MLP
+        #hidden layers
+        for k in range(n_layers-2):
+            Gin_layers.append(Dropout(rate=dropout))
+            update_layer = Lambda(update_graph, arguments={'epsilon': epsilon})
+            Gin_layers.append(update_layer)
+            MLP = init_MLP(layer_sizes=layer_sizes, use_bn=use_bn, activation=activation)
+            Gin_layers += MLP
+        #output layer
+        Gin_layers.append(Dropout(rate=dropout))
+        update_layer = Lambda(update_graph, arguments={'epsilon': epsilon})
+        Gin_layers.append(update_layer)
+        MLP = init_MLP(layer_sizes=layer_sizes, use_bn=use_bn, activation=activation)
+        Gin_layers += MLP
+        Gin_layers.append(Dropout(rate=dropout))
+        return Gin_layers
 
     def apply_list_layers(input , list_layers,ndim_input=3):
         intermediate_output = input
@@ -47,13 +75,12 @@ def GINDeepSigns(input_graph, in_channels, hidden_channels, out_channels, num_la
                     layer_ = TimeDistributed(layer_)
             intermediate_output = layer_(intermediate_output)
         return intermediate_output
-
+    """
     layer_sizes = [hidden_channels] * num_layers
     list_encoder_layers = init_MLP(layer_sizes=layer_sizes, use_bn=use_bn, activation=activation)
     list_mlp_layers = init_MLP(layer_sizes=layer_sizes, use_bn=use_bn, activation=activation)
 
     enc_vectors = apply_list_layers(input_graph, list_encoder_layers,ndim_input=5)
-
     neg_input_graph = Lambda(lambda x: -x)(input_graph)
     enc_neg_vectors = apply_list_layers(neg_input_graph, list_encoder_layers, ndim_input=5)
 
@@ -61,7 +88,29 @@ def GINDeepSigns(input_graph, in_channels, hidden_channels, out_channels, num_la
     enc_sign_invariant_vectors = Lambda(lambda x: tf.reshape(x,[-1,x.shape[1], x.shape[2], x.shape[3]*x.shape[4]]) )(enc_sign_invariant_vectors) # [B,Naa,K,m*dim_enc])
     intermediate_output =  apply_list_layers(enc_sign_invariant_vectors,  list_mlp_layers, ndim_input = 4)
     output_embedding = Lambda(lambda x: tf.reduce_mean(x, axis=2))(intermediate_output) # [B,Naa,m*dim_enc]
-    return output_embedding
+    """
+
+    def minus(g,i):
+        """compute g_minus """
+        g_minus_i = tf.expand_dims(tf.multiply(g[:,:,:,i,:], -1),axis=3)
+        return tf.concat([g[:, :, :, :i, :], g_minus_i, g[:, :, :, i+1:, :]], axis=3)
+    # version finale
+
+    m = input_graph.shape[3]
+    layer_sizes = [hidden_channels] * num_layers
+    # init of enc (GIN)
+    GIN_layers = init_GIN(epsilon=epsilon,n_layers=num_layers,layer_sizes=layer_sizes,use_bn=use_bn,activation=activation,dropout=dropout)
+    list_x = []
+    enc_vectors = apply_list_layers(input_graph, GIN_layers, ndim_input=5)  # [B,Naa,m,6]
+    for i in range(m):
+        g_minus = Lambda(minus,arguments={'i':i})(input_graph) # multiply motion i by -1
+        enc_neg_vectors = apply_list_layers(g_minus,GIN_layers,ndim_input=5) # [B,Naa,m,6]
+        enc_sign_invariant_vectors = Add()([enc_vectors, enc_neg_vectors])[:,:,0,i] # enc(vi) + enc(-vi)
+        list_x.append(Lambda(lambda x: tf.expand_dims(enc_sign_invariant_vectors,axis=2))(enc_sign_invariant_vectors))
+    sign_invariant_vectors = Lambda(lambda l: tf.concat(l,axis=2))(list_x) # [B,Naa,m,6]
+    MLP = init_MLP(layer_sizes, use_bn, activation)
+    sign_invariant_vectors = Lambda(lambda x: apply_list_layers(x,MLP,ndim_input=4))(sign_invariant_vectors)
+    return sign_invariant_vectors
 
 '''
 from layers_signnet.mlp import MLP

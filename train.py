@@ -8,6 +8,7 @@ import utilities.paths as paths
 from keras.callbacks import EarlyStopping, ReduceLROnPlateau
 import os
 import sys
+from tensorflow.keras.callbacks import TensorBoard
 
 def make_PR_curves(
         all_labels,
@@ -281,15 +282,22 @@ if __name__ == '__main__':
 
         #%% Train!
 
+        # Tensorboard visualization
+        file_name = 'motion_model'
+        tensorboard = TensorBoard(log_dir="log\\{}".format(file_name),histogram_freq=1)
+
         extra_params['validation_data'] = (
             validation_inputs, validation_outputs, validation_weights)
         extra_params['callbacks'] = [
             EarlyStopping(monitor='val_categorical_crossentropy', min_delta=0.001, patience=5,
                           verbose=1, mode='min', restore_best_weights=True),
             ReduceLROnPlateau(monitor='val_categorical_crossentropy', factor=0.5,
-                              patience=2, verbose=1, mode='min', min_delta=0.001, cooldown=2)
+                              patience=2, verbose=1, mode='min', min_delta=0.001, cooldown=2),
+            tensorboard
         ]
 
+
+        # Fitting
         history = model.fit(train_inputs, train_outputs,
                             sample_weight=train_weights, **extra_params)
         print('Training completed! Saving model')
