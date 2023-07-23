@@ -105,9 +105,9 @@ def GINDeepSigns(input_graph, in_channels, hidden_channels, out_channels, num_la
     for i in range(m):
         g_minus = Lambda(minus,arguments={'i':i})(input_graph) # multiply motion i by -1
         enc_neg_vectors = apply_list_layers(g_minus,GIN_layers,ndim_input=5) # [B,Naa,m,6]
-        enc_sign_invariant_vectors = Add()([enc_vectors, enc_neg_vectors])[:,:,0,i] # enc(vi) + enc(-vi)
-        list_x.append(Lambda(lambda x: tf.expand_dims(enc_sign_invariant_vectors,axis=2))(enc_sign_invariant_vectors))
-    sign_invariant_vectors = Lambda(lambda l: tf.concat(l,axis=2))(list_x) # [B,Naa,m,6]
+        enc_sign_invariant_vectors = Add()([enc_vectors, enc_neg_vectors]) # enc(vi) + enc(-vi)
+        list_x.append(Lambda(lambda x: tf.expand_dims(x[:,:,0,i],axis=2))(enc_sign_invariant_vectors))
+    sign_invariant_vectors = Concatenate(axis=2)(list_x)  # [B,Naa,m,6]
     MLP = init_MLP(layer_sizes, use_bn, activation)
     sign_invariant_vectors = Lambda(lambda x: apply_list_layers(x,MLP,ndim_input=4))(sign_invariant_vectors)
     return sign_invariant_vectors
