@@ -78,19 +78,18 @@ def GINDeepSigns(input_graph, hidden_channels, num_layers, use_bn=False, dropout
 
     def minus(g,i):
         Naa = g.shape[1]
-        K = 16
         """compute g_minus """
         # Motion to multiply
-        g_sliced = tf.transpose(g,[4,1,2,3,0]) # [6,Naa,K,m,B]
-        g_sliced_i = tf.strided_slice(g_sliced,begin=[0,0,0,i],end=[6,Naa,K,i+1]) # [6,Naa,K,1,B]
+        g_sliced = tf.transpose(g,[4,1,3,2,0]) # [6,Naa,m,K,B]
+        g_sliced_i = tf.strided_slice(g_sliced,begin=[0,0,i],end=[6,Naa,i+1]) # [6,Naa,K,1,B]
         g_minus_i = tf.multiply(g_sliced_i,-1)
-        g_minus_i = tf.transpose(g_minus_i,[4,1,2,3,0]) # [B,Naa,K,1,6]
+        g_minus_i = tf.transpose(g_minus_i,[4,1,3,2,0]) # [B,Naa,K,1,6]
         # left leftover
-        g_sliced_left = tf.strided_slice(g_sliced,begin=[0,0,0,0],end=[6,Naa,K,i]) # [B,Naa,K,i,6]
-        g_sliced_left = tf.transpose(g_sliced_left,[4,1,2,3,0]) # [B,Naa,K,i,6]
+        g_sliced_left = tf.strided_slice(g_sliced,begin=[0,0,0],end=[6,Naa,i]) # [B,Naa,K,i,6]
+        g_sliced_left = tf.transpose(g_sliced_left,[4,1,3,2,0]) # [B,Naa,K,i,6]
         # right leftover
-        g_sliced_right = tf.strided_slice(g_sliced, begin=[0, 0, 0, i+1], end=[6, Naa, K, m])  # [B,Naa,K,m-i-1,6]
-        g_sliced_right = tf.transpose(g_sliced_right, [4, 1, 2, 3, 0])  # [B,Naa,K,m-i-1,6]
+        g_sliced_right = tf.strided_slice(g_sliced, begin=[0,0,i+1], end=[6,Naa,m])  # [B,Naa,K,m-i-1,6]
+        g_sliced_right = tf.transpose(g_sliced_right, [4,1,3,2,0])  # [B,Naa,K,m-i-1,6]
         return Concatenate(axis=3)([g_sliced_left,g_minus_i,g_sliced_right])
 
 
