@@ -8,7 +8,7 @@ import utilities.paths as paths
 from keras.callbacks import EarlyStopping, ReduceLROnPlateau
 import os
 import sys
-from tensorflow.keras.callbacks import TensorBoard
+from keras.callbacks import TensorBoard
 
 def make_PR_curves(
         all_labels,
@@ -80,7 +80,7 @@ if __name__ == '__main__':
     train = True # True to retrain, False to evaluate the model shown in paper.
     use_evolutionary = False # True to use evolutionary information (requires hhblits and a sequence database), False otherwise.
     Lmax_aa = 256 if check else 1024
-    motion_vectors = 10 # False
+    motion_vectors = 1 # False # is not working for 1 or 2 which is strange ...
     ''' 
     Maximum length of the protein sequences.
     Sequences longer than Lmax_aa are truncated, sequences shorter are grouped and processed using the protein serialization trick (see Materials and Methods of paper).

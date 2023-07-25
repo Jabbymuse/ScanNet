@@ -833,7 +833,7 @@ class ScanNetPipeline(Pipeline):
             aa_attributes = aa_attributes.astype(curr_float)
             # print('Computed aa frame cloud, seqlength:%s, MSA_file:%s' % (len(sequence), MSA_file))
 
-            # compuation of aa_motion_vectors
+            # computation of aa_motion_vectors
             if bool(self.motion_vectors) & (aa_motion_vectors is None):
                 aa_motion_vectors = PDB_processing.apply_NOLB(chain_obj,sequence_lengths = [len(sequence)],m=self.motion_vectors) # nd_array with shape (Naa,m*6)
 

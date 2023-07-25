@@ -7,7 +7,7 @@ from keras.layers import Input, Dense, Masking, TimeDistributed, Concatenate, Ac
 from keras.initializers import Zeros, Ones, RandomUniform
 from . import embeddings
 
-def GINDeepSigns(input_graph, in_channels, hidden_channels, out_channels, num_layers, k, use_bn=False, use_ln=False, dropout=0.5, activation='relu',epsilon=0.5):
+def GINDeepSigns(input_graph, hidden_channels, num_layers, use_bn=False, dropout=0.5, activation='relu',epsilon=0.5):
 
     def init_MLP(layer_sizes=[64,32,16], use_bn=True, activation=None):
         if activation == 'tanh':
@@ -75,70 +75,44 @@ def GINDeepSigns(input_graph, in_channels, hidden_channels, out_channels, num_la
                     layer_ = TimeDistributed(layer_)
             intermediate_output = layer_(intermediate_output)
         return intermediate_output
-    """
-    layer_sizes = [hidden_channels] * num_layers
-    list_encoder_layers = init_MLP(layer_sizes=layer_sizes, use_bn=use_bn, activation=activation)
-    list_mlp_layers = init_MLP(layer_sizes=layer_sizes, use_bn=use_bn, activation=activation)
-
-    enc_vectors = apply_list_layers(input_graph, list_encoder_layers,ndim_input=5)
-    neg_input_graph = Lambda(lambda x: -x)(input_graph)
-    enc_neg_vectors = apply_list_layers(neg_input_graph, list_encoder_layers, ndim_input=5)
-
-    enc_sign_invariant_vectors = Add()([enc_vectors,enc_neg_vectors]) # [B, Naa, K, m, dim_enc]
-    enc_sign_invariant_vectors = Lambda(lambda x: tf.reshape(x,[-1,x.shape[1], x.shape[2], x.shape[3]*x.shape[4]]) )(enc_sign_invariant_vectors) # [B,Naa,K,m*dim_enc])
-    intermediate_output =  apply_list_layers(enc_sign_invariant_vectors,  list_mlp_layers, ndim_input = 4)
-    output_embedding = Lambda(lambda x: tf.reduce_mean(x, axis=2))(intermediate_output) # [B,Naa,m*dim_enc]
-    """
 
     def minus(g,i):
+        Naa = g.shape[1]
+        K = 16
         """compute g_minus """
-        g_minus_i = tf.expand_dims(tf.multiply(g[:,:,:,i,:], -1),axis=3)
-        return tf.concat([g[:, :, :, :i, :], g_minus_i, g[:, :, :, i+1:, :]], axis=3)
-    # version finale
+        # Motion to multiply
+        g_sliced = tf.transpose(g,[4,1,2,3,0]) # [6,Naa,K,m,B]
+        g_sliced_i = tf.strided_slice(g_sliced,begin=[0,0,0,i],end=[6,Naa,K,i+1]) # [6,Naa,K,1,B]
+        g_minus_i = tf.multiply(g_sliced_i,-1)
+        g_minus_i = tf.transpose(g_minus_i,[4,1,2,3,0]) # [B,Naa,K,1,6]
+        # left leftover
+        g_sliced_left = tf.strided_slice(g_sliced,begin=[0,0,0,0],end=[6,Naa,K,i]) # [B,Naa,K,i,6]
+        g_sliced_left = tf.transpose(g_sliced_left,[4,1,2,3,0]) # [B,Naa,K,i,6]
+        # right leftover
+        g_sliced_right = tf.strided_slice(g_sliced, begin=[0, 0, 0, i+1], end=[6, Naa, K, m])  # [B,Naa,K,m-i-1,6]
+        g_sliced_right = tf.transpose(g_sliced_right, [4, 1, 2, 3, 0])  # [B,Naa,K,m-i-1,6]
+        return Concatenate(axis=3)([g_sliced_left,g_minus_i,g_sliced_right])
+
 
     m = input_graph.shape[3]
+    Naa = input_graph.shape[1]
     layer_sizes = [hidden_channels] * num_layers
     # init of enc (GIN)
     GIN_layers = init_GIN(epsilon=epsilon,n_layers=num_layers,layer_sizes=layer_sizes,use_bn=use_bn,activation=activation,dropout=dropout)
     list_x = []
     enc_vectors = apply_list_layers(input_graph, GIN_layers, ndim_input=5)  # [B,Naa,m,6]
     for i in range(m):
-        g_minus = Lambda(minus,arguments={'i':i})(input_graph) # multiply motion i by -1
-        enc_neg_vectors = apply_list_layers(g_minus,GIN_layers,ndim_input=5) # [B,Naa,m,6]
-        enc_sign_invariant_vectors = Add()([enc_vectors, enc_neg_vectors]) # enc(vi) + enc(-vi)
-        list_x.append(Lambda(lambda x: tf.expand_dims(x[:,:,0,i],axis=2))(enc_sign_invariant_vectors))
-    sign_invariant_vectors = Concatenate(axis=2)(list_x)  # [B,Naa,m,6]
+        g_minus = Lambda(minus,arguments={'i':i},name='G_minus')(input_graph) # multiply ith motion by -1
+        enc_neg_vectors = apply_list_layers(g_minus,GIN_layers,ndim_input=5) # [B,Naa,K,m,6]
+        enc_sign_invariant_vectors = Add()([enc_vectors, enc_neg_vectors])# enc(vi) + enc(-vi)
+        enc_sign_invariant_vectors = Lambda(lambda x : tf.transpose(x,[4,1,2,3,0]),name='First_transpose_GIN')(enc_sign_invariant_vectors) # [6,Naa,K,m,B]
+        enc_sign_invariant_vectors = Lambda(lambda x: tf.strided_slice(x,begin=[0,0,0,i],end=[6,Naa,1,i+1]),name='Strided_Slice_GIN')(enc_sign_invariant_vectors) # [6,Naa,1,1,B]
+        enc_sign_invariant_vectors = Lambda(lambda x : tf.transpose(x,[4,1,2,3,0]),name='Second_transpose_GIN')(enc_sign_invariant_vectors) # [B,Naa,1,1,6]
+        list_x.append(Lambda(lambda x: tf.reshape(x,shape=[-1,Naa,1,6]),name='Reshape_GIN')(enc_sign_invariant_vectors)) # [B,Naa,1,6]
+    if len(list_x) > 1: # to treat the case where there is just one motion vector
+        sign_invariant_vectors = Concatenate(axis=2)(list_x)  # [B,Naa,m,6]
+    else:
+        sign_invariant_vectors = list_x[0]
     MLP = init_MLP(layer_sizes, use_bn, activation)
-    sign_invariant_vectors = Lambda(lambda x: apply_list_layers(x,MLP,ndim_input=4))(sign_invariant_vectors)
+    sign_invariant_vectors = Lambda(lambda x: apply_list_layers(x,MLP,ndim_input=4),name='Last_MLP_GIN')(sign_invariant_vectors)
     return sign_invariant_vectors
-
-'''
-from layers_signnet.mlp import MLP
-from layers_signnet.gin import GIN
-import tensorflow as tf
-
-class GINDeepSigns(tf.keras.layers.Layer):
-    """Sign invariant neural network
-       f(v1, ..., vm) = rho(enc(v1) + enc(-v1), ..., enc(vm) + enc(-vm))
-       x = (v1,...,vm)
-       g is the adjacency graph (cf neighborhood)
-    """
-    def __init__(self, in_channels, hidden_channels, out_channels, num_layers, k, use_bn=False, use_ln=False, dropout=0.5, activation='relu'):
-        super(GINDeepSigns, self).__init__()
-        self.enc = GIN(in_channels, hidden_channels, out_channels, num_layers, use_bn=use_bn, dropout=dropout, activation=activation)
-        rho_dim = out_channels * k
-        self.rho = MLP(rho_dim, hidden_channels, out_channels, num_layers, use_bn=use_bn, dropout=dropout, activation=activation)
-        self.k = k
-
-    def call(self, inputs, g = None): # x are the eigenvectors and g the neigbhours of the amino_acid (both tensors)
-        vectors = g[:,:,0]
-        m = g.shape[3] # g has shape B * Naa * K * m * 6
-        list_x = [] # list of modified columns for m motions
-        for i in range(m):
-            # creation of g_minus and x_minus at index i
-            g_minus = tf.expand_dims(tf.multiply(g[:,:,:,i,:], -1),axis=3)
-            g_minus = tf.concat([g[:, :, :, :i, :], g_minus, g[:, :, :, i+1:, :]], axis=3)
-            vectors_minus = g_minus[:,:,0]
-            list_x.append(tf.expand_dims((self.enc(None,g=g,x=vectors)+self.enc(None,g=g_minus,x=vectors_minus))[:,:,i],axis=2)) # list of [B,Naa,1,6]
-        return self.rho(tf.concat(list_x,axis=2)) # [B,Naa,m,6] and then MLP
-'''

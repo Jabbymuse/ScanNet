@@ -655,7 +655,6 @@ def apply_NOLB(chain_objs, path_to_nolb = path_to_nolb,sequence_lengths = None,m
         chain_objs = [chain_objs]
     if sequence_lengths is None:
         sequence_lengths = [len(process_chain(chain_obj)[0]) for chain_obj in chain_objs]
-
     hash = str(datetime.now())[-6:] + "{:06d}".format(np.random.randint(0,high=100000) )
     # creation of file paths
     input_pdb_file = os.path.join(structures_folder, f'tmp_{hash}.pdb')

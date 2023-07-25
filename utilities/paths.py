@@ -7,7 +7,7 @@ predictions_folder = library_folder + 'predictions/' # Output folder.
 model_folder = library_folder + 'models/' # Where the networks as stored as pairs of files (.h5,.data).
 
 # Path to NOLB
-path_to_nolb = library_folder + 'motion/NOLB_mac'
+path_to_nolb = library_folder + 'motion/NOLB'
 
 # Additional paths required for prediction with evolutionary information.
 MSA_folder = library_folder + 'MSA/' # Where multiple sequence alignments are stored.

@@ -526,11 +526,12 @@ def ScanNet(
             None, 1, None), name='dropout')(SCAN_filters_aa)
 
     if motion_vectors:
-        signed_vectors = signnet.GINDeepSigns(graph_aligned_vectors, None, 6, None, 2, None, use_bn=False, use_ln=False, dropout=0.5, activation='relu')
+        m = graph_aligned_vectors.shape[3]
+        signed_vectors = signnet.GINDeepSigns(graph_aligned_vectors, 6, 2, use_bn=False, dropout=0.5, activation='relu')
         # Embedding of motion_attributes
         embedded_attributes_motion_aa = attribute_embedding(signed_vectors, 6, activation,name='embedded_attributes_motion_aa') # 6 is purely arbitrary here ...
-        embedded_attributes_motion_aa = Lambda(lambda x: tf.reshape(x,shape=[-1,Lmax_aa,x.shape[2]*x.shape[3]]))(embedded_attributes_motion_aa) # prepare concatenation
-        embedded_filter = Concatenate(name='ScanNet_filters_aa-embedded_attributes_motion_aa', axis=-1)([SCAN_filters_aa, embedded_attributes_motion_aa])
+        embedded_attributes_motion_aa = Lambda(lambda x: tf.reshape(x,shape=[-1,Lmax_aa,m*6]))(embedded_attributes_motion_aa) # prepare concatenation
+        embedded_filter = Concatenate(name='ScanNet_filters_aa-embedded_attributes_motion_aa', axis=-1)([SCAN_filters_aa,embedded_attributes_motion_aa])
     else:
         embedded_filter = SCAN_filters_aa
     if filter_MLP:
