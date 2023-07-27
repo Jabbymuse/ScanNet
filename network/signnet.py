@@ -1,9 +1,7 @@
 from layers_signnet.mlp import MLP
 from layers_signnet.gin import GIN
 import tensorflow as tf
-from keras.engine.base_layer import Layer
-
-from keras.layers import Input, Dense, Masking, TimeDistributed, Concatenate, Activation, Embedding, Dropout, Lambda,Add
+from keras.layers import Layer,Input, Dense, Masking, TimeDistributed, Concatenate, Activation, Embedding, Dropout, Lambda,Add,BatchNormalization
 from keras.initializers import Zeros, Ones, RandomUniform
 from . import embeddings
 
@@ -34,8 +32,8 @@ def GINDeepSigns(input_graph, hidden_channels, num_layers, use_bn=False, dropout
             list_layers.append(TimeDistributed(Dense(layer_size, use_bias=False, activation=None),
                                                 name='GIN_MLP_projection_%s'%k) )
             if use_bn:
-                list_layers.append(embeddings.MaskedBatchNormalization(
-                epsilon=1e-3, axis=-1, center=center, scale=scale, name='GIN_MLP_normalization_%s'%k) )
+                list_layers.append(BatchNormalization(
+                epsilon=1e-3, axis=-1, fused=False,center=center, scale=scale, name='GIN_MLP_normalization_%s'%k) )
             list_layers.append(TimeDistributed(Activation(activation), name='GIN_MLP_activation_%s'%k) )
         return list_layers
 
@@ -114,5 +112,6 @@ def GINDeepSigns(input_graph, hidden_channels, num_layers, use_bn=False, dropout
     else:
         sign_invariant_vectors = list_x[0]
     MLP = init_MLP(layer_sizes, use_bn, activation)
-    sign_invariant_vectors = Lambda(lambda x: apply_list_layers(x,MLP,ndim_input=4),name='Last_MLP_GIN')(sign_invariant_vectors)
+    sign_invariant_vectors = apply_list_layers(sign_invariant_vectors, MLP, ndim_input=4)
+    # sign_invariant_vectors = Lambda(lambda x: apply_list_layers(x,MLP,ndim_input=4),name='Last_MLP_GIN')(sign_invariant_vectors)
     return sign_invariant_vectors

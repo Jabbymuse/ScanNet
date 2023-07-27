@@ -1,8 +1,7 @@
-from keras.engine.base_layer import Layer
 from keras import backend as K
 import tensorflow as tf
 import numpy as np
-from keras.layers import Input, Masking, Dense
+from keras.layers import Layer,Input, Masking, Dense
 from keras.models import Model, Sequential
 from utilities import wrappers
 from preprocessing.pipelines import padd_matrix

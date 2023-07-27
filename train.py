@@ -34,7 +34,7 @@ def make_PR_curves(
         labels = all_labels[i]
         predictions = all_predictions[i]
         weights = all_weights[i]
-        weights_repeated = np.array([np.ones(len(label)) * weight for label, weight in zip(labels, weights)], dtype=np.object)
+        weights_repeated = wrappers.wrap_list([np.ones(len(label)) * weight for label, weight in zip(labels, weights)])
         labels_flat=np.concatenate(labels)
         predictions_flat=np.concatenate(predictions)
         is_nan = np.isnan(predictions_flat) | np.isinf(labels_flat)
@@ -80,7 +80,7 @@ if __name__ == '__main__':
     train = True # True to retrain, False to evaluate the model shown in paper.
     use_evolutionary = False # True to use evolutionary information (requires hhblits and a sequence database), False otherwise.
     Lmax_aa = 256 if check else 1024
-    motion_vectors = 1 # False # is not working for 1 or 2 which is strange ...
+    motion_vectors = 10 # False # is not working for 1 or 2 which is strange ...
     ''' 
     Maximum length of the protein sequences.
     Sequences longer than Lmax_aa are truncated, sequences shorter are grouped and processed using the protein serialization trick (see Materials and Methods of paper).
@@ -320,7 +320,7 @@ if __name__ == '__main__':
     ]
 
 
-    test_labels = [ np.array([
+    test_labels = [ wrappers.wrap_list([
                 np.argmax(label, axis=1)[:Lmax_aa] # Back to 0-1 labels from one-hot encoding and truncate to Lmax.
                 for label in list_outputs[i]]) for i in [5,6,7,8] ]
 

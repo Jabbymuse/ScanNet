@@ -34,7 +34,7 @@ def make_PR_curves(
         labels = all_labels[i]
         predictions = all_predictions[i]
         weights = all_weights[i]
-        weights_repeated = np.array([np.ones(len(label)) * weight for label, weight in zip(labels, weights)], dtype=np.object)
+        weights_repeated = wrappers.wrap_list([np.ones(len(label)) * weight for label, weight in zip(labels, weights)], dtype=np.object)
         labels_flat=np.concatenate(labels)
         predictions_flat=np.concatenate(predictions)
         is_nan = np.isnan(predictions_flat) | np.isinf(labels_flat)

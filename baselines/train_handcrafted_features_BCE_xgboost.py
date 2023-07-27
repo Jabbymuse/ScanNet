@@ -234,7 +234,7 @@ if __name__ == '__main__':
     for k in range(5):
         print('Performing predictions on the test set for fold %s...' % (k + 1))
         best_bsts[k].save_model(model_folder + model_names[k] + '.model')
-        all_cross_predictions.append( np.array([best_bsts[k].predict(xgb.DMatrix(inputs_, feature_names=feature_names)) for inputs_ in list_inputs[k]] ) )
+        all_cross_predictions.append( wrappers.wrap_list([best_bsts[k].predict(xgb.DMatrix(inputs_, feature_names=feature_names)) for inputs_ in list_inputs[k]] ) )
 
     all_cross_predictions = np.concatenate(all_cross_predictions)
     all_labels = np.concatenate(list_outputs)

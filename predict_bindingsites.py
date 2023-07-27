@@ -475,7 +475,7 @@ def predict_interface_residues(
             2. Compute the degree of each aa by summing its contribution to all other amino acids.
             3. Put back into predictions.
             '''
-            calpha_coordinates = [inputs[3][n].astype(np.float32)[inputs[0][n].astype(np.int)[..., 0]] for n in range(len(inputs[0]))]
+            calpha_coordinates = [inputs[3][n].astype(np.float32)[inputs[0][n].astype(int)[..., 0]] for n in range(len(inputs[0]))]
             K_graph = model_obj.kwargs['K_graph']
             neighborhood_graphs = [np.argsort(PDB_processing.distance(calpha_coordinate,calpha_coordinate), axis=1)[:,:K_graph] for calpha_coordinate in calpha_coordinates]
             if layer == 'attention_layer':
@@ -537,7 +537,7 @@ def predict_interface_residues(
                 3. Put back into predictions.
                 '''
 
-                calpha_coordinates = [inputs[3][n].astype(np.float32)[inputs[0][n].astype(np.int)[..., 0]] for n in range(len(inputs[0]))]
+                calpha_coordinates = [inputs[3][n].astype(np.float32)[inputs[0][n].astype(int)[..., 0]] for n in range(len(inputs[0]))]
                 K_graph = model_obj.kwargs['K_graph']
                 neighborhood_graphs = [np.argsort(PDB_processing.distance(calpha_coordinate,calpha_coordinate), axis=1)[:,:K_graph] for calpha_coordinate in calpha_coordinates]
                 if layer == 'attention_layer':

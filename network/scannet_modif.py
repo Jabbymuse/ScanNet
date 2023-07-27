@@ -1,5 +1,5 @@
 from keras.models import Model
-from keras.layers import Input, Dense, Masking, TimeDistributed, Concatenate, Activation, Embedding, Dropout, Lambda,Reshape
+from keras.layers import Input, Dense, Masking, TimeDistributed, Concatenate, Activation, Embedding, Dropout, Lambda,Reshape,BatchNormalization
 from keras.initializers import Zeros, Ones, RandomUniform
 import numpy as np
 import keras.regularizers
@@ -67,8 +67,8 @@ def addNonLinearity(input_layer, activation, name=None):
         center = True
         scale = True
 
-    input_layer_normalized = embeddings.MaskedBatchNormalization(
-        epsilon=1e-3, axis=-1, center=center, scale=scale, name=name + '_normalization')(
+    input_layer_normalized = BatchNormalization(
+        epsilon=1e-3, axis=-1,fused=False, center=center, scale=scale, name=name + '_normalization')(
         input_layer)  # Custom batch norm layer that takes into account the mask.
 
     if 'multitanh' in activation:
@@ -526,11 +526,11 @@ def ScanNet(
             None, 1, None), name='dropout')(SCAN_filters_aa)
 
     if motion_vectors:
-        m = graph_aligned_vectors.shape[3]
+        # m = graph_aligned_vectors.shape[3]
         signed_vectors = signnet.GINDeepSigns(graph_aligned_vectors, 6, 2, use_bn=False, dropout=0.5, activation='relu')
         # Embedding of motion_attributes
         embedded_attributes_motion_aa = attribute_embedding(signed_vectors, 6, activation,name='embedded_attributes_motion_aa') # 6 is purely arbitrary here ...
-        embedded_attributes_motion_aa = Lambda(lambda x: tf.reshape(x,shape=[-1,Lmax_aa,m*6]))(embedded_attributes_motion_aa) # prepare concatenation
+        embedded_attributes_motion_aa = Lambda(lambda x: tf.reshape(x,shape=[-1,Lmax_aa,motion_vectors*6]))(embedded_attributes_motion_aa) # prepare concatenation
         embedded_filter = Concatenate(name='ScanNet_filters_aa-embedded_attributes_motion_aa', axis=-1)([SCAN_filters_aa,embedded_attributes_motion_aa])
     else:
         embedded_filter = SCAN_filters_aa

@@ -1,4 +1,3 @@
-from keras.engine.base_layer import Layer
 from keras import backend as K
 from keras.constraints import NonNeg
 from keras.initializers import Zeros,TruncatedNormal,Ones,RandomUniform
@@ -7,7 +6,7 @@ from sklearn.mixture import GaussianMixture
 import keras
 from network.utils import Init2Value,FixedNorm,Symmetric,ConstraintBetween
 import tensorflow as tf
-from keras.layers import BatchNormalization
+from keras.layers import BatchNormalization,Layer
 
 class GaussianKernel(Layer):
     def __init__(self, N, initial_values, covariance_type='diag', eps=1e-1, **kwargs):

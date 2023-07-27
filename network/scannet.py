@@ -1,5 +1,5 @@
 from keras.models import Model
-from keras.layers import Input, Dense, Masking, TimeDistributed, Concatenate, Activation, Embedding, Dropout, Lambda
+from keras.layers import Input, Dense, Masking, TimeDistributed, Concatenate, Activation, Embedding, Dropout, Lambda,BatchNormalization
 from keras.initializers import Zeros, Ones,RandomUniform
 import numpy as np
 import keras.regularizers
@@ -65,8 +65,8 @@ def addNonLinearity(input_layer, activation, name=None):
         center = True
         scale = True
 
-    input_layer_normalized = embeddings.MaskedBatchNormalization(
-        epsilon=1e-3, axis=-1, center=center, scale=scale, name=name + '_normalization')(input_layer) # Custom batch norm layer that takes into account the mask.
+    input_layer_normalized = BatchNormalization(
+        epsilon=1e-3, axis=-1, center=center, scale=scale, fused=False,name=name + '_normalization')(input_layer) # Custom batch norm layer that takes into account the mask.
 
     if 'multitanh' in activation:
         output_layer = embeddings.MultiTanh(int(activation[-1]), use_bias=True, name=name)(

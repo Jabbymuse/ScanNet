@@ -35,7 +35,7 @@ atom_to_index = dict([(list_atoms[i], i) for i in range(len(list_atoms))])
 atom_to_index['OT1'] = atom_to_index['O']
 atom_to_index['OT2'] = atom_to_index['OXT']
 
-index_to_type = np.zeros(38,dtype=np.int)
+index_to_type = np.zeros(38,dtype=int)
 for atom,index in atom_to_index.items():
     index_to_type[index] = list_atoms_types.index(atom[0])
 
@@ -586,7 +586,7 @@ dictionary_atom_valencies = {
 }
 
 
-index_to_valency = np.zeros([20, 38], dtype=np.int)
+index_to_valency = np.zeros([20, 38], dtype=int)
 for k, aa in enumerate(list_aa):
     for key, value in dictionary_atom_valencies[aa].items():
         i = list_atoms.index(key)

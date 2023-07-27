@@ -212,8 +212,8 @@ def weight_logo_valency(W, threshold=0.5, ymax=3,bar=True):
     neg_order = np.argsort(W[neg_atoms])[::-1]
 
     if len(neg_atoms) >= 10: # Negative activation whenever any atom is present.
-        neg_atoms = np.array([-1],dtype=np.int)
-        neg_order = np.array([0],dtype=np.int)
+        neg_atoms = np.array([-1],dtype=int)
+        neg_order = np.array([0],dtype=int)
 
     fig, ax = plt.subplots(figsize=(4, 8))
     ypos = 0.01
@@ -447,7 +447,7 @@ def rgb_to_hex(rgb):
         rgb = np.array(rgb)[:3]
         if rgb.max() < 1:
             rgb *= 256
-        rgb = np.floor(rgb).astype(np.int)
+        rgb = np.floor(rgb).astype(int)
         return '#%02x%02x%02x' % (rgb[0], rgb[1], rgb[2])
 
 

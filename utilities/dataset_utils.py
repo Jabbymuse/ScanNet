@@ -5,6 +5,7 @@ import preprocessing.PDBio as PDBio
 import preprocessing.PDB_processing as PDB_processing
 import preprocessing.sequence_utils as sequence_utils
 from utilities.paths import MSA_folder,structures_folder,pipeline_folder
+from utilities.wrappers import wrap_list
 import numpy as np
 import utilities.io_utils as io_utils
 
@@ -21,7 +22,7 @@ def write_labels(list_origins, list_sequences, list_resids, list_labels, output_
             L = len(sequence)
             f.write('>%s\n' % origin)
             for l in range(L):
-                if label.dtype == np.float:
+                if label.dtype == float:
                     f.write('%s %s %s %.4f\n' % (resids[l, -2], resids[l, -1], sequence[l], label[l]))
                 else:
                     f.write('%s %s %s %s\n' % (resids[l, -2], resids[l, -1], sequence[l], label[l]))
@@ -68,8 +69,8 @@ def read_labels(input_file, nmax=np.inf, label_type='int'):
 
     list_origins = np.array(list_origins)
     list_sequences = np.array(list_sequences)
-    list_labels = np.array(list_labels)
-    list_resids = np.array(list_resids)
+    list_labels = wrap_list(list_labels)
+    list_resids = wrap_list(list_resids)
     return list_origins, list_sequences, list_resids, list_labels
 
 
@@ -91,7 +92,7 @@ def align_labels(labels, pdb_resids,label_resids=None,format='missing'):
         if format == 'sparse': # Unaligned labels are assigned category zero.
             aligned_labels = np.zeros( [sequence_length] + list(labels.shape[1:]), dtype=labels.dtype)
         elif format == 'missing': # Unaligned labels are assigned -1/nan category (unknown label, no backpropagation).
-            if labels.dtype == np.int:
+            if labels.dtype == int:
                 aligned_labels = np.zeros( [sequence_length] + list(labels.shape[1:]), dtype=labels.dtype) -1
             else:
                 aligned_labels = np.zeros( [sequence_length] + list(labels.shape[1:]), dtype=labels.dtype) + np.nan

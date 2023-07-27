@@ -7,6 +7,11 @@ def slice_list_of_arrays(arrays, mask):
         return [slice_list_of_arrays(array, mask) for array in arrays]
     else:
         return arrays[mask]
+def wrap_list(arrays):
+    try:
+        return np.array(list(arrays))
+    except:
+        return np.array(list(arrays), dtype=object)
 
 
 def stack_list_of_arrays(arrays,padded=True):
@@ -16,7 +21,7 @@ def stack_list_of_arrays(arrays,padded=True):
         if padded:
             return np.concatenate(list(arrays), axis=0)
         else:
-            return np.array(list(arrays), dtype=np.object)
+            return wrap_list(list(arrays))
 
 
 
@@ -251,7 +256,7 @@ class grouped_Predictor_wrapper(Predictor_wrapper):
 
         order = np.argsort(Ls)[::-1]
         batches = []
-        placed = np.zeros(len(Ls),dtype=np.bool)
+        placed = np.zeros(len(Ls),dtype=bool)
 
         for k in order:
             if not placed[k]:
@@ -375,10 +380,10 @@ class grouped_Predictor_wrapper(Predictor_wrapper):
         if multi_valued:
             nexamples = sum([len(group) for group in groups[0]])
             noutputs = len(grouped_outputs)
-            outputs = [ np.array([None for _ in range(nexamples)],dtype=np.object) for _ in range(noutputs) ]
+            outputs = [ wrap_list([None for _ in range(nexamples)]) for _ in range(noutputs) ]
         else:
             nexamples = sum([len(group) for group in groups])
-            outputs = np.array([None for _ in range(nexamples)],dtype=np.object)
+            outputs = wrap_list([None for _ in range(nexamples)])
             noutputs = 1
         if multi_valued:
             for n in range(noutputs):
@@ -451,13 +456,13 @@ class grouped_Predictor_wrapper(Predictor_wrapper):
         if self.verbose:
             print('prediction done!')
         if (not return_all) & self.multi_outputs:
-            return np.array([output_[:,1] for output_ in outputs[0]])
+            return wrap_list([output_[:,1] for output_ in outputs[0]])
         elif (not return_all) & ~self.multi_outputs:
-            return np.array([output_[:,1] for output_ in outputs])
+            return wrap_list([output_[:,1] for output_ in outputs])
         elif return_all & self.multi_outputs:
-            return [np.array(outputs_) for outputs_ in outputs]
+            return [wrap_list(outputs_) for outputs_ in outputs]
         else:
-            return np.array([output_ for output_ in outputs])
+            return wrap_list([output_ for output_ in outputs])
 
 
     def fit(self, inputs, outputs, **kwargs):

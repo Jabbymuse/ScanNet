@@ -2,6 +2,7 @@ import numpy as np
 from utilities import io_utils
 from utilities.paths import pipeline_folder,MSA_folder,structures_folder
 from utilities.dataset_utils import align_labels
+from utilities.wrappers import wrap_list
 from multiprocessing import Pool
 from functools import partial
 import time
@@ -89,9 +90,9 @@ def categorize_variable(matrix, mini, maxi, n_classes):
 
 def binarize_categorical(matrix, n_classes, out=None):
     L = matrix.shape[0]
-    matrix = matrix.astype(np.int)
+    matrix = matrix.astype(int)
     if out is None:
-        out = np.zeros([L, n_classes], dtype=np.bool)
+        out = np.zeros([L, n_classes], dtype=bool)
     subset = (matrix>=0) & (matrix<n_classes)
     out[np.arange(L)[subset],matrix[subset]] = 1
     return out
@@ -274,13 +275,13 @@ class Pipeline():
                         for l in range(ninputs):
                             inputs[l] += list(batch_output[0][l])
                 for l in range(ninputs):
-                    inputs[l] = np.array(inputs[l])
+                    inputs[l] = wrap_list(inputs[l])
             else:
                 inputs = []
                 for batch_output in batch_outputs:
                     if batch_output[0] != []:
                         inputs += list(batch_output[0])
-                inputs = np.array(inputs)
+                inputs = wrap_list(inputs)
             if has_labels:
                 if output_is_list:
                     outputs = [[] for _ in range(noutputs)]
@@ -295,10 +296,10 @@ class Pipeline():
                     for batch_output in batch_outputs:
                         if batch_output[1] != []:
                             outputs += list(batch_output[1])
-                    outputs = np.array(outputs)
+                    outputs = wrap_list(outputs)
             else:
                 outputs = None
-            failed_samples = list(np.concatenate([np.array(batch_outputs[k][2],dtype=np.int)+k*batch_size for k in range(ncores)]))
+            failed_samples = list(np.concatenate([np.array(batch_outputs[k][2],dtype=int)+k*batch_size for k in range(ncores)]))
             return inputs,outputs,failed_samples
         else:
             inputs = []
@@ -367,12 +368,12 @@ class Pipeline():
                     outputs = np.stack(outputs,axis=0)
             else:
                 if ninputs>1:
-                    inputs = [np.array([input[k] for input in inputs])
+                    inputs = [wrap_list([input[k] for input in inputs])
                               for k in range(ninputs)]
                 else:
-                    inputs = np.array(inputs)
+                    inputs = wrap_list(inputs)
                 if has_labels:
-                    outputs = np.array(outputs)
+                    outputs = wrap_list(outputs)
             if has_labels:
                 return inputs, outputs,failed_samples
             else:
@@ -893,7 +894,7 @@ class ScanNetPipeline(Pipeline):
             inputs += [atom_triplets,atom_attributes,atom_indices,atom_clouds]
 
         if labels is not None:
-            if labels.dtype in [np.bool,np.int]:
+            if labels.dtype in [bool,int]:
                 outputs = binarize_categorical(
                     labels, 2).astype(curr_int)
             else:
@@ -918,7 +919,7 @@ class ScanNetPipeline(Pipeline):
 
         if 'PWM' in self.requirements:
             index = targets_Beff.index(self.Beff)
-            all_PWMs = np.array([PWM[:, :, index]
+            all_PWMs = wrap_list([PWM[:, :, index]
                                 for PWM in env['all_PWMs']])
 
         inputs = []
@@ -955,7 +956,7 @@ class ScanNetPipeline(Pipeline):
                       for k in range(ninputs)]
             outputs = np.concatenate(outputs)
         else:
-            inputs = [np.array([input[k] for input in inputs])
+            inputs = [wrap_list([input[k] for input in inputs])
                       for k in range(ninputs)]
-            outputs = np.array(outputs)
+            outputs = wrap_list(outputs)
         return inputs, outputs,failed_samples

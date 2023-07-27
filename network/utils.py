@@ -1,4 +1,4 @@
-from keras.engine.base_layer import Layer
+from keras.layers import Layer
 from keras import backend as K
 from keras.constraints import Constraint
 from keras.initializers import Initializer
@@ -153,7 +153,7 @@ class PoolbyIndices(Layer):
         if mask[1] is not None:
             mapping = tf.logical_and(mapping,tf.expand_dims(mask[1],axis=-2) )
         mapping = tf.cast(mapping,tf.float32)
-        array_target = tf.matmul(tf.cast(mapping,tf.float32), array_source)/(1e-10+tf.reduce_sum(mapping,axis=-1,keep_dims=True) )
+        array_target = tf.matmul(tf.cast(mapping,tf.float32), array_source)/(1e-10+tf.reduce_sum(mapping,axis=-1,keepdims=True) )
         return array_target
 
     def compute_output_shape(self, input_shape):

@@ -1,4 +1,4 @@
-from keras.engine.base_layer import Layer
+from keras.layers import Layer
 from keras import backend as K
 import tensorflow as tf
 
@@ -63,11 +63,11 @@ class AttentionLayer(Layer):
 
         ##
         attention_coefficients -= tf.reduce_max(
-            attention_coefficients, axis=[-3, -2], keep_dims=True)
+            attention_coefficients, axis=[-3, -2], keepdims=True)
         attention_coefficients_final = tf.reduce_sum(tf.expand_dims(
             graph_weights, axis=-1) * K.exp(attention_coefficients), axis=-2)
         attention_coefficients_final /= tf.reduce_sum(
-            tf.abs(attention_coefficients_final), axis=-2, keep_dims=True) + self.epsilon
+            tf.abs(attention_coefficients_final), axis=-2, keepdims=True) + self.epsilon
         output_final = tf.reshape(tf.reduce_sum(node_outputs * tf.expand_dims(
             attention_coefficients_final, axis=-2), axis=2), [-1, self.Lmax, self.nfeatures_output * self.nheads])
         return [output_final, attention_coefficients_final]
