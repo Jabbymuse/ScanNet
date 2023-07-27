@@ -8,6 +8,7 @@ from keras.initializers import Zeros, Ones, RandomUniform
 from . import embeddings
 
 def GINDeepSigns(input_graph, hidden_channels, num_layers, use_bn=False, dropout=0.5, activation='relu',epsilon=0.5):
+    """ Implementation of SignNet, sign invariant neural network : f(v1,...,vm) = MLP(GIN(v1) + GIN(-v1), ... , GIN(vm) + GIN(-vm))"""
 
     def init_MLP(layer_sizes=[64,32,16], use_bn=True, activation=None):
         if activation == 'tanh':
@@ -101,13 +102,13 @@ def GINDeepSigns(input_graph, hidden_channels, num_layers, use_bn=False, dropout
     list_x = []
     enc_vectors = apply_list_layers(input_graph, GIN_layers, ndim_input=5)  # [B,Naa,m,6]
     for i in range(m):
-        g_minus = Lambda(minus,arguments={'i':i},name='G_minus')(input_graph) # multiply ith motion by -1
+        g_minus = Lambda(minus,arguments={'i':i})(input_graph) # multiply ith motion by -1
         enc_neg_vectors = apply_list_layers(g_minus,GIN_layers,ndim_input=5) # [B,Naa,K,m,6]
         enc_sign_invariant_vectors = Add()([enc_vectors, enc_neg_vectors])# enc(vi) + enc(-vi)
-        enc_sign_invariant_vectors = Lambda(lambda x : tf.transpose(x,[4,1,2,3,0]),name='First_transpose_GIN')(enc_sign_invariant_vectors) # [6,Naa,K,m,B]
-        enc_sign_invariant_vectors = Lambda(lambda x: tf.strided_slice(x,begin=[0,0,0,i],end=[6,Naa,1,i+1]),name='Strided_Slice_GIN')(enc_sign_invariant_vectors) # [6,Naa,1,1,B]
-        enc_sign_invariant_vectors = Lambda(lambda x : tf.transpose(x,[4,1,2,3,0]),name='Second_transpose_GIN')(enc_sign_invariant_vectors) # [B,Naa,1,1,6]
-        list_x.append(Lambda(lambda x: tf.reshape(x,shape=[-1,Naa,1,6]),name='Reshape_GIN')(enc_sign_invariant_vectors)) # [B,Naa,1,6]
+        enc_sign_invariant_vectors = Lambda(lambda x : tf.transpose(x,[4,1,2,3,0]),name=f'First_transpose_GIN_{i}')(enc_sign_invariant_vectors) # [6,Naa,K,m,B]
+        enc_sign_invariant_vectors = Lambda(lambda x: tf.strided_slice(x,begin=[0,0,0,i],end=[6,Naa,1,i+1]),name=f'Strided_Slice_GIN{i}')(enc_sign_invariant_vectors) # [6,Naa,1,1,B]
+        enc_sign_invariant_vectors = Lambda(lambda x : tf.transpose(x,[4,1,2,3,0]),name=f'Second_transpose_GIN{i}')(enc_sign_invariant_vectors) # [B,Naa,1,1,6]
+        list_x.append(Lambda(lambda x: tf.reshape(x,shape=[-1,Naa,1,6]),name=f'Reshape_GIN{i}')(enc_sign_invariant_vectors)) # [B,Naa,1,6]
     if len(list_x) > 1: # to treat the case where there is just one motion vector
         sign_invariant_vectors = Concatenate(axis=2)(list_x)  # [B,Naa,m,6]
     else:
