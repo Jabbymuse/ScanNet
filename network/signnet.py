@@ -37,6 +37,15 @@ def GINDeepSigns(input_graph, hidden_channels, num_layers, use_bn=False, dropout
             list_layers.append(TimeDistributed(Activation(activation), name='GIN_MLP_activation_%s'%k) )
         return list_layers
 
+    def copy_mask(inputs,mask=None):
+        return mask
+
+    def slice_mask(inputs, mask=None):
+        if mask is not None:
+            return mask[...,0,:1]
+        else:
+            return mask
+
     def update_graph(g,epsilon):
         """ compute the aggregation and the update of the input graph g """
         return tf.concat([tf.expand_dims(tf.reduce_sum(g,axis=2) + epsilon * g[:,:,0],axis=2),g[:,:,1:]],axis=2)
@@ -45,20 +54,20 @@ def GINDeepSigns(input_graph, hidden_channels, num_layers, use_bn=False, dropout
         """ first version without bn"""
         Gin_layers = []
         # input layer
-        update_layer = Lambda(update_graph,arguments={'epsilon':epsilon})
+        update_layer = Lambda(update_graph,arguments={'epsilon':epsilon},mask= copy_mask)
         Gin_layers.append(update_layer)
         MLP = init_MLP(layer_sizes=layer_sizes,use_bn=use_bn,activation=activation)
         Gin_layers += MLP
         #hidden layers
         for k in range(n_layers-2):
             Gin_layers.append(Dropout(rate=dropout))
-            update_layer = Lambda(update_graph, arguments={'epsilon': epsilon})
+            update_layer = Lambda(update_graph, arguments={'epsilon': epsilon},mask= copy_mask)
             Gin_layers.append(update_layer)
             MLP = init_MLP(layer_sizes=layer_sizes, use_bn=use_bn, activation=activation)
             Gin_layers += MLP
         #output layer
         Gin_layers.append(Dropout(rate=dropout))
-        update_layer = Lambda(update_graph, arguments={'epsilon': epsilon})
+        update_layer = Lambda(update_graph, arguments={'epsilon': epsilon},mask= copy_mask)
         Gin_layers.append(update_layer)
         MLP = init_MLP(layer_sizes=layer_sizes, use_bn=use_bn, activation=activation)
         Gin_layers += MLP
@@ -92,6 +101,13 @@ def GINDeepSigns(input_graph, hidden_channels, num_layers, use_bn=False, dropout
         return Concatenate(axis=3)([g_sliced_left,g_minus_i,g_sliced_right])
 
 
+    def apply_GIN_permuts(x,Naa,i):
+        x = tf.transpose(x,[4,1,2,3,0]) # first transpose.
+        x = tf.strided_slice(x,begin=[0,0,0,i],end=[6,Naa,1,i+1]) # Strided slice
+        x = tf.transpose(x,[4,1,2,3,0]) # Second transpose
+        x = tf.reshape(x,shape=[-1,Naa,1,6]) # reshape
+        return x
+
     m = input_graph.shape[3]
     Naa = input_graph.shape[1]
     layer_sizes = [hidden_channels] * num_layers
@@ -100,13 +116,15 @@ def GINDeepSigns(input_graph, hidden_channels, num_layers, use_bn=False, dropout
     list_x = []
     enc_vectors = apply_list_layers(input_graph, GIN_layers, ndim_input=5)  # [B,Naa,m,6]
     for i in range(m):
-        g_minus = Lambda(minus,arguments={'i':i})(input_graph) # multiply ith motion by -1
+        g_minus = Lambda(minus,arguments={'i':i},mask=copy_mask)(input_graph) # multiply ith motion by -1
         enc_neg_vectors = apply_list_layers(g_minus,GIN_layers,ndim_input=5) # [B,Naa,K,m,6]
         enc_sign_invariant_vectors = Add()([enc_vectors, enc_neg_vectors])# enc(vi) + enc(-vi)
-        enc_sign_invariant_vectors = Lambda(lambda x : tf.transpose(x,[4,1,2,3,0]),name=f'First_transpose_GIN_{i}')(enc_sign_invariant_vectors) # [6,Naa,K,m,B]
-        enc_sign_invariant_vectors = Lambda(lambda x: tf.strided_slice(x,begin=[0,0,0,i],end=[6,Naa,1,i+1]),name=f'Strided_Slice_GIN{i}')(enc_sign_invariant_vectors) # [6,Naa,1,1,B]
-        enc_sign_invariant_vectors = Lambda(lambda x : tf.transpose(x,[4,1,2,3,0]),name=f'Second_transpose_GIN{i}')(enc_sign_invariant_vectors) # [B,Naa,1,1,6]
-        list_x.append(Lambda(lambda x: tf.reshape(x,shape=[-1,Naa,1,6]),name=f'Reshape_GIN{i}')(enc_sign_invariant_vectors)) # [B,Naa,1,6]
+        enc_sign_invariant_vectors = Lambda(apply_GIN_permuts,arguments={'i':i,'Naa':Naa},mask=slice_mask)(enc_sign_invariant_vectors)
+        list_x.append(enc_sign_invariant_vectors)
+        # enc_sign_invariant_vectors = Lambda(lambda x : tf.transpose(x,[4,1,2,3,0]),name=f'First_transpose_GIN_{i}')(enc_sign_invariant_vectors) # [6,Naa,K,m,B]
+        # enc_sign_invariant_vectors = Lambda(lambda x: tf.strided_slice(x,begin=[0,0,0,i],end=[6,Naa,1,i+1]),name=f'Strided_Slice_GIN{i}')(enc_sign_invariant_vectors) # [6,Naa,1,1,B]
+        # enc_sign_invariant_vectors = Lambda(lambda x : tf.transpose(x,[4,1,2,3,0]),name=f'Second_transpose_GIN{i}')(enc_sign_invariant_vectors) # [B,Naa,1,1,6]
+        # list_x.append(Lambda(lambda x: tf.reshape(x,shape=[-1,Naa,1,6]),name=f'Reshape_GIN{i}')(enc_sign_invariant_vectors)) # [B,Naa,1,6]
     if len(list_x) > 1: # to treat the case where there is just one motion vector
         sign_invariant_vectors = Concatenate(axis=2)(list_x)  # [B,Naa,m,6]
     else:

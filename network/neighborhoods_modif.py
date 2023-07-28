@@ -419,10 +419,21 @@ class LocalNeighborhood(Layer):
             if 'frame' in self.first_format:
                 first_mask = first_mask[:, :, 1]
 
+            attribute_ndims = [len(input.shape) - 2 for input in inputs[-self.nattributes:]]
             if self.nrotations>1:
-                return [tf.expand_dims(tf.expand_dims(first_mask,axis=-1),axis=-1) ]* (1+ self.nattributes)
+                expanded_mask = tf.repeat(tf.expand_dims(tf.repeat(tf.expand_dims(first_mask,axis=-1),self.Kmax,axis=-1),axis=-1),self.nrotations,axis=-1)
             else:
-                return [tf.expand_dims(first_mask,axis=-1) ] * (1+self.nattributes)
+                expanded_mask = tf.repeat(tf.expand_dims(first_mask, axis=-1),self.Kmax,axis=-1)
+            masks = [expanded_mask]
+            for k,attribute_ndim in enumerate(attribute_ndims):
+                mask_ = expanded_mask
+                for l in range(attribute_ndim-1):
+                    mask_ = tf.repeat(tf.expand_dims(mask_,axis=-1), inputs[-self.nattributes+k].shape[l+2],axis=-1)
+                masks.append(mask_)
+            return masks
+            #     return [tf.expand_dims(tf.expand_dims(first_mask,axis=-1),axis=-1) ]* (1+ self.nattributes)
+            # else:
+            #     return [tf.expand_dims(first_mask,axis=-1) ] * (1+self.nattributes)
         else:
             return mask
 
