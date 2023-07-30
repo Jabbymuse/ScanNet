@@ -242,7 +242,7 @@ def ScanNet(
         covariance_type_atom='full',
         covariance_type_aa='full',
         covariance_type_graph='diag',
-        activation='multitanh5',
+        activation='relu',
         coordinates_atom=['euclidian'],
         coordinates_aa=['euclidian'],
         frame_aa='triplet_backbone',
@@ -261,7 +261,10 @@ def ScanNet(
         dropout=0.,
         optimizer='adam',
         output='classification',
-        motion_vectors=False  # False or number or number motion vectors.
+        motion_vectors=False,  # False or number or number motion vectors.
+        nembedding_motion = 6,
+        nlayers_motion =2,
+        bn_motion=False,
 ):
     if frame_aa == 'triplet_backbone':
         order_aa = '3'
@@ -666,8 +669,11 @@ def initialize_ScanNet(
         n_init=10,
         epochs=100,
         batch_size=1,
-        motion_vectors=False # Either False or the number of motion vectors
-):
+        motion_vectors=False, # Either False or the number of motion vectors
+        nembedding_motion = 6,
+        nlayers_motion = 2,
+        bn_motion = False,
+    ):
     Lmax_atom = 9 * Lmax_aa
     if frame_aa == 'triplet_backbone':
         Lmax_aa_points = Lmax_aa + 2
@@ -861,6 +867,9 @@ def initialize_ScanNet(
                                                multi_inputs=True,
                                                multi_outputs=False,
                                                motion_vectors=motion_vectors,
+                                               nembedding_motion=nembedding_motion,
+                                               nlayers_motion=nlayers_motion,
+                                               bn_motion=bn_motion,
                                                )
     extra_params = {'epochs': epochs, 'batch_size': batch_size}
     return model, extra_params

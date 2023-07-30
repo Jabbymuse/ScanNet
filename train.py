@@ -65,7 +65,7 @@ def make_PR_curves(
     plt.ylabel('Precision', fontsize=fs)
     plt.title(title,fontsize=fs)
     plt.tight_layout()
-    return fig, ax
+    return fig, ax,all_AUCPRs
 
 
 
@@ -87,7 +87,7 @@ if __name__ == '__main__':
     If memory allows it, use the largest protein length found in the dataset.
     For PPBS, we used Lmax_aa = 1024 in the paper.
     '''
-    epochs_max = 10
+    epochs_max = 100
 
     ncores = 4
 
@@ -327,14 +327,12 @@ if __name__ == '__main__':
 
     test_weights = [list_weights[i] for i in [5,6,7,8] ]
 
-
-
     print('Evaluating predictions on the test set...')
 
     if not os.path.isdir(paths.library_folder + 'plots/'):
         os.mkdir(paths.library_folder + 'plots/')
 
-    fig,ax = make_PR_curves(
+    fig,ax,_ = make_PR_curves(
             test_labels,
             test_predictions,
             test_weights,
@@ -343,8 +341,7 @@ if __name__ == '__main__':
             figsize=(10, 10),
             margin=0.05,grid=0.1
             ,fs=16)
-
-    fig.savefig(paths.library_folder + 'plots/PR_curve_PPBS_%s.png'%model_name,dpi=300)
+    fig.savefig(paths.library_folder + 'plots/PR_curve_%s_%s.png'%model_name,dpi=300)
 
 
 

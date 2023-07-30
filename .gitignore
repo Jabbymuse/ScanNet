@@ -144,3 +144,6 @@ datasets/.DS_Store
 datasets/.DS_Store
 utilities/paths_jerome.py
 *test.ipynb
+all_predictions/
+training_logs/
+submit_job*

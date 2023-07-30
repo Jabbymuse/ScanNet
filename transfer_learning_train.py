@@ -281,7 +281,7 @@ if __name__ == '__main__':
     if not os.path.isdir(paths.library_folder + 'plots/'):
         os.mkdir(paths.library_folder + 'plots/')
 
-    fig, ax = make_PR_curves(
+    fig, ax,_ = make_PR_curves(
         [all_labels],
         [all_cross_predictions],
         [all_weights],

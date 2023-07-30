@@ -215,7 +215,7 @@ def ScanNet(
         covariance_type_atom='full',
         covariance_type_aa='full',
         covariance_type_graph='diag',
-        activation='multitanh5',
+        activation='relu',
         coordinates_atom=['euclidian'],
         coordinates_aa=['euclidian'],
         frame_aa='triplet_backbone',
