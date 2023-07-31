@@ -1,5 +1,15 @@
 import sys,os
 sys.path.append(os.getcwd())
+def set_num_threads(num_threads=2):
+    os.environ["MKL_NUM_THREADS"] = "%s"%num_threads
+    os.environ["NUMEXPR_NUM_THREADS"] = "%s"%num_threads
+    os.environ["OMP_NUM_THREADS"] = "%s"%num_threads
+    os.environ["OPENBLAS_NUM_THREADS"] = "%s"%num_threads
+    os.environ["VECLIB_MAXIMUM_THREADS"] = "%s"%num_threads
+    os.environ["NUMBA_NUM_THREADS"] = "%s"%num_threads
+# os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+set_num_threads(num_threads=4)
+
 import preprocessing.pipelines_modifie as pipelines
 import utilities.dataset_utils as dataset_utils
 import utilities.wrappers as wrappers
@@ -9,7 +19,7 @@ import numpy as np
 import utilities.paths as paths
 
 check = False  # Check = True to verify installation, =False for full training.
-all_use_evolutionary = [False,True]#[False]
+all_use_evolutionary = [False]#,True]#[False]
 all_motion_vectors = [False,1,2,3,4,5,6,7,8,9,10]  # False # is not working for 1 or 2 which is strange ...
 ncores = 32#8
 model_acronyms = {'interface':'PPI','epitope': 'PAI', 'idp': 'PIDPI'}

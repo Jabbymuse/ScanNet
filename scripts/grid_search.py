@@ -37,6 +37,7 @@ if __name__ == '__main__':
     Lmax_aa = 256 if args.check else Lmax_aas[args.mode]
     epochs_max = 100
     save_predictions = True
+    train = True
 
     architectures = [
         {'nembedding_motion':6, 'nlayers_motion':2,'use_bn':False},
@@ -88,73 +89,76 @@ if __name__ == '__main__':
         validation_inputs = [np.concatenate([list_inputs[i][j] for i in [1,2,3,4] ] ) for j in range( len(list_inputs[0]) ) ]
         validation_outputs = np.concatenate([list_outputs[i] for i in [1,2,3,4]])
         validation_weights = np.concatenate([list_weights[i] for i in [1,2,3,4]])
+        if train:
+            model, extra_params = scannet.initialize_ScanNet(
+                train_inputs,
+                train_outputs,
+                with_atom=True, # Whether to use atomic coordinates or not.
+                Lmax_aa=Lmax_aa, # Maximum protein length used for training
+                K_aa=16, # Size of neighborhood for amino acid Neighborhood Embedding Module (NEM)
+                K_atom=16, # Size of neighborhood for atom Neighborhood Embedding Module (NEM)
+                K_graph=32, # Size of neighborhood for Neighborhood Attention Module (NAM)
+                Dmax_aa=11., # Cut-off distance for the amino acid NEM. Only used when initializing the aa gaussian kernels.
+                Dmax_atom=4., # Cut-off distance for the atom NEM. Only used when initializing the gaussian kernels.
+                Dmax_graph=13., # Cut-off distance for the amino acid NAM. Only used when initializing the gaussian kernels.
+                N_aa=32, # Number of gaussian kernels for amino acid NEM
+                N_atom=32, # Number of gaussian kernels for atom NEM
+                N_graph=32, # Number of gaussian kernels for amino acid NAM
+                nfeatures_aa=21 if args.use_evolutionary else 20, # Number of amino acid-wise input attributes.
+                nfeatures_atom=12, # Number of atom-wise input attributes (categorical variable).
+                nembedding_atom=12, # Dimension of atom attribute embedding. If = nfeatures_atom, use non-trainable one-hot-encoding. # possible changes
+                nembedding_aa=32, # Dimension of amino acid attribute embedding.
+                nembedding_graph=1, # Number of values per edge for the NAM.
+                dense_pooling=64, # Number of channels for atom -> amino acid pooling operation.
+                nattentionheads_pooling=64,  # Number of attention heads for atom -> amino acid pooling operation.
+                nfilters_atom=128, # Number of atomic spatio-chemical filters
+                nfilters_aa=128, # Number of amino acid spatio-chemical filters
+                nfilters_graph=2, # Number of outputs for NAM.
+                nattentionheads_graph=1, # Number of attention heads for NAM.
+                filter_MLP=[32], # Dimensionality reduction (trainable dense layer) applied after amino acid NEM and before NAM.
+                covariance_type_atom='full', # Full or diagonal covariance matrix for atom NEM module
+                covariance_type_aa='full', # Full or diagonal covariance matrix for amino acid NEM module
+                covariance_type_graph='full', # Full or diagonal covariance matrix for graph NEM module
+                activation='relu', # Activation function
+                coordinates_atom=['euclidian'], # Local coordinate system used for the atom NEM
+                coordinates_aa=['euclidian'], # Local coordinate system used for the amino acid NEM
+                frame_aa='triplet_sidechain', # Choice of amino acid frames (backbone-only also supported).
+                coordinates_graph=['distance', 'ZdotZ', 'ZdotDelta', 'index_distance'], # Local coordinate system used for the amino acid NAM
+                index_distance_max_graph=8, # Maximum sequence distance used.
+                l12_atom=2e-3, # Sparse regularization for atom NEM.
+                l12_aa=2e-3, # Sparse regularization for amino acid NEM.
+                l12_pool=2e-3, # Sparse regularization for atom to amino acid pooling.
+                optimizer='adam', # Optimizer.
+                batch_size=1, # Batch size.
+                epochs=epochs_max,  # Maximum number of epochs
+                initial_values_folder = paths.initial_values_folder,
+                save_initial_values= False if args.check else True, # Cache the initial Gaussian kernels for next training.
+                n_init=2, # Parameter for initializing the Gaussian kernels. Number of initializations for fitting the GMM model with sklearn. 10 were used for the paper.
+                motion_vectors=args.motion_vectors,
+                nembedding_motion = architectures[args.motion_architecture]['nembedding_motion'],
+                nlayers_motion = architectures[args.motion_architecture]['nlayers_motion'],
+                bn_motion = architectures[args.motion_architecture]['use_bn'],
+            )
 
-        model, extra_params = scannet.initialize_ScanNet(
-            train_inputs,
-            train_outputs,
-            with_atom=True, # Whether to use atomic coordinates or not.
-            Lmax_aa=Lmax_aa, # Maximum protein length used for training
-            K_aa=16, # Size of neighborhood for amino acid Neighborhood Embedding Module (NEM)
-            K_atom=16, # Size of neighborhood for atom Neighborhood Embedding Module (NEM)
-            K_graph=32, # Size of neighborhood for Neighborhood Attention Module (NAM)
-            Dmax_aa=11., # Cut-off distance for the amino acid NEM. Only used when initializing the aa gaussian kernels.
-            Dmax_atom=4., # Cut-off distance for the atom NEM. Only used when initializing the gaussian kernels.
-            Dmax_graph=13., # Cut-off distance for the amino acid NAM. Only used when initializing the gaussian kernels.
-            N_aa=32, # Number of gaussian kernels for amino acid NEM
-            N_atom=32, # Number of gaussian kernels for atom NEM
-            N_graph=32, # Number of gaussian kernels for amino acid NAM
-            nfeatures_aa=21 if args.use_evolutionary else 20, # Number of amino acid-wise input attributes.
-            nfeatures_atom=12, # Number of atom-wise input attributes (categorical variable).
-            nembedding_atom=12, # Dimension of atom attribute embedding. If = nfeatures_atom, use non-trainable one-hot-encoding. # possible changes
-            nembedding_aa=32, # Dimension of amino acid attribute embedding.
-            nembedding_graph=1, # Number of values per edge for the NAM.
-            dense_pooling=64, # Number of channels for atom -> amino acid pooling operation.
-            nattentionheads_pooling=64,  # Number of attention heads for atom -> amino acid pooling operation.
-            nfilters_atom=128, # Number of atomic spatio-chemical filters
-            nfilters_aa=128, # Number of amino acid spatio-chemical filters
-            nfilters_graph=2, # Number of outputs for NAM.
-            nattentionheads_graph=1, # Number of attention heads for NAM.
-            filter_MLP=[32], # Dimensionality reduction (trainable dense layer) applied after amino acid NEM and before NAM.
-            covariance_type_atom='full', # Full or diagonal covariance matrix for atom NEM module
-            covariance_type_aa='full', # Full or diagonal covariance matrix for amino acid NEM module
-            covariance_type_graph='full', # Full or diagonal covariance matrix for graph NEM module
-            activation='relu', # Activation function
-            coordinates_atom=['euclidian'], # Local coordinate system used for the atom NEM
-            coordinates_aa=['euclidian'], # Local coordinate system used for the amino acid NEM
-            frame_aa='triplet_sidechain', # Choice of amino acid frames (backbone-only also supported).
-            coordinates_graph=['distance', 'ZdotZ', 'ZdotDelta', 'index_distance'], # Local coordinate system used for the amino acid NAM
-            index_distance_max_graph=8, # Maximum sequence distance used.
-            l12_atom=2e-3, # Sparse regularization for atom NEM.
-            l12_aa=2e-3, # Sparse regularization for amino acid NEM.
-            l12_pool=2e-3, # Sparse regularization for atom to amino acid pooling.
-            optimizer='adam', # Optimizer.
-            batch_size=1, # Batch size.
-            epochs=epochs_max,  # Maximum number of epochs
-            initial_values_folder = paths.initial_values_folder,
-            save_initial_values= False if args.check else True, # Cache the initial Gaussian kernels for next training.
-            n_init=2, # Parameter for initializing the Gaussian kernels. Number of initializations for fitting the GMM model with sklearn. 10 were used for the paper.
-            motion_vectors=args.motion_vectors,
-            nembedding_motion = architectures[args.motion_architecture]['nembedding_motion'],
-            nlayers_motion = architectures[args.motion_architecture]['nlayers_motion'],
-            bn_motion = architectures[args.motion_architecture]['use_bn'],
-        )
+            #%% Train!
+            extra_params['validation_data'] = (
+                validation_inputs, validation_outputs, validation_weights)
+            extra_params['callbacks'] = [
+                EarlyStopping(monitor='val_categorical_crossentropy', min_delta=0.001, patience=5,
+                              verbose=1, mode='min', restore_best_weights=True),
+                ReduceLROnPlateau(monitor='val_categorical_crossentropy', factor=0.5,
+                                  patience=2, verbose=1, mode='min', min_delta=0.001, cooldown=2),
+            ]
+            if args.tensorboard:
+                # Tensorboard visualization
+                extra_params['callbacks'].append( TensorBoard(f"training_logs/{args.mode}/{model_name}/",histogram_freq=1) )
+            # Fitting
+            history = model.fit(train_inputs, train_outputs,sample_weight=train_weights, **extra_params)
+            print('Training completed! Saving model')
+            model.save(paths.model_folder +model_name)
+        else:
+            model = wrappers.load_model(paths.model_folder +model_name)
 
-        #%% Train!
-        extra_params['validation_data'] = (
-            validation_inputs, validation_outputs, validation_weights)
-        extra_params['callbacks'] = [
-            EarlyStopping(monitor='val_categorical_crossentropy', min_delta=0.001, patience=5,
-                          verbose=1, mode='min', restore_best_weights=True),
-            ReduceLROnPlateau(monitor='val_categorical_crossentropy', factor=0.5,
-                              patience=2, verbose=1, mode='min', min_delta=0.001, cooldown=2),
-        ]
-        if args.tensorboard:
-            # Tensorboard visualization
-            extra_params['callbacks'].append( TensorBoard(f"training_logs/{args.mode}/{model_name}/",histogram_freq=1) )
-        # Fitting
-        history = model.fit(train_inputs, train_outputs,sample_weight=train_weights, **extra_params)
-        print('Training completed! Saving model')
-        model.save(paths.model_folder +model_name)
 
         print('Performing predictions on the test set...')
         test_predictions = [
@@ -227,7 +231,7 @@ if __name__ == '__main__':
             test_labels,
             test_predictions,
             test_weights,
-            preprocess_datasets.list_datasets[args.mode][-5:],
+            preprocess_datasets.list_dataset_names[args.mode][5:] if args.mode == 'interface' else preprocess_datasets.list_dataset_names[args.mode],
             title = 'Protein-protein binding site prediction: %s'%model_name,
             figsize=(10, 10),
             margin=0.05,grid=0.1
@@ -242,7 +246,7 @@ if __name__ == '__main__':
             figsize=(10, 10),
             margin=0.05,grid=0.1
             ,fs=16)
-    dict_AUCPRs = dict(zip(preprocess_datasets.list_datasets[args.mode][-5:], AUCPRs))
+    dict_AUCPRs = dict(zip(preprocess_datasets.list_dataset_names[args.mode][5:] if args.mode == 'interface' else preprocess_datasets.list_dataset_names[args.mode], AUCPRs))
     dict_AUCPRs['All'] = AUCPR_all[0]
 
     fig.savefig(paths.library_folder + 'plots/PR_curve_%s_%s.png'%(preprocess_datasets.model_acronyms[args.mode],model_name),dpi=300)

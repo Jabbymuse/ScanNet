@@ -12,7 +12,7 @@ for motion_vectors in all_motion_vectors:
         for use_evolutionary in all_use_evolutionary:
             for mode in all_modes:
                 for repeat in all_repeats:
-                    command = python_binary + f'mode {mode} --motion_vectors {motion_vectors} --motion_architecture {motion_architecture} --repeat {repeat}'
+                    command = python_binary + f' scripts/grid_search.py --mode {mode} --motion_vectors {motion_vectors} --motion_architecture {motion_architecture} --repeat {repeat}'
                     if use_evolutionary:
                         command += ' --use_evolutionary'
                     # print(command)
