@@ -530,10 +530,10 @@ def ScanNet(
 
     if motion_vectors:
         # m = graph_aligned_vectors.shape[3]
-        signed_vectors = signnet.GINDeepSigns(graph_aligned_vectors, 6, 2, use_bn=False, dropout=0.5, activation='relu')
+        signed_vectors = signnet.GINDeepSigns(graph_aligned_vectors, nembedding_motion, 2, use_bn=bn_motion, dropout=0.5, activation='relu')
         # Embedding of motion_attributes
-        embedded_attributes_motion_aa = attribute_embedding(signed_vectors, 6, activation,name='embedded_attributes_motion_aa') # 6 is purely arbitrary here ...
-        embedded_attributes_motion_aa = Lambda(lambda x: tf.reshape(x,shape=[-1,Lmax_aa,motion_vectors*6]))(embedded_attributes_motion_aa) # prepare concatenation
+        embedded_attributes_motion_aa = attribute_embedding(signed_vectors, nembedding_motion, activation,name='embedded_attributes_motion_aa') # 6 is purely arbitrary here ...
+        embedded_attributes_motion_aa = Lambda(lambda x: tf.reshape(x,shape=[-1,Lmax_aa,motion_vectors*nembedding_motion]))(embedded_attributes_motion_aa) # prepare concatenation
         embedded_filter = Concatenate(name='ScanNet_filters_aa-embedded_attributes_motion_aa', axis=-1)([SCAN_filters_aa,embedded_attributes_motion_aa])
     else:
         embedded_filter = SCAN_filters_aa
